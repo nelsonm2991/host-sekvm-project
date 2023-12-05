@@ -38,3 +38,5 @@ obj-y += SmmuPTAlloc.o
 obj-y += SmmuPTOps.o
 obj-y += SmmuPTWalk.o
 obj-y += SmmuSPTWalk.o
+#dpm
+obj-y += DPM.o

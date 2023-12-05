@@ -140,7 +140,25 @@ struct el2_data {
 
 	u64 phys_mem_start;
 	u64 phys_mem_size;
+
+	struct dpm dpm_info;
 };
+
+// DPM Overall Metadata
+struct dpm {
+	u64 base_page_addr;
+	u64 region_count;
+	u64 page_count;
+}
+
+// DPM Region-specific Metadata
+struct dpm_region {
+	u64 start_addr;
+	u64 page_count;
+	u8 flags;
+	struct dpm_region* prev;
+	struct dpm_region* next;
+}
 
 void init_el2_data_page(void);
 
@@ -168,7 +186,7 @@ static inline void _arch_spin_unlock(b_arch_spinlock_t *lock)
 }
 
 static inline void stage2_spin_lock(b_arch_spinlock_t *lock)
-{	
+{
 	_arch_spin_lock(lock);
 }
 
@@ -183,13 +201,13 @@ static inline void el2_init_vgic_cpu_base(phys_addr_t base)
 	el2_data->vgic_cpu_base = base;
 }
 
-static inline struct el2_data* get_el2_data_start(void) 
+static inline struct el2_data* get_el2_data_start(void)
 {
 	struct el2_data *el2_data = kern_hyp_va(kvm_ksym_ref(el2_data_start));
 	return el2_data;
 }
 
-static inline struct shared_data* get_shared_data_start(void) 
+static inline struct shared_data* get_shared_data_start(void)
 {
 	struct shared_data *shared_data = kern_hyp_va(kvm_ksym_ref(shared_data_start));
 	return shared_data;
@@ -289,7 +307,7 @@ static u64 inline get_shadow_ctxt(u32 vmid, u32 vcpuid, u32 index)
 	int offset = VCPU_IDX(vmid, vcpuid);
 	u64 val;
 	if (index < V_FAR_EL2)
-		val = el2_data->shadow_vcpu_ctxt[offset].regs[index]; 
+		val = el2_data->shadow_vcpu_ctxt[offset].regs[index];
 	else if (index == V_FAR_EL2)
 		val = el2_data->shadow_vcpu_ctxt[offset].far_el2;
 	else if (index == V_HPFAR_EL2)
@@ -319,7 +337,7 @@ static void inline set_shadow_ctxt(u32 vmid, u32 vcpuid, u32 index, u64 value) {
 	int offset = VCPU_IDX(vmid, vcpuid);
 	//el2_data->shadow_vcpu_ctxt[offset].regs[index] = value;
 	if (index < V_FAR_EL2)
-		el2_data->shadow_vcpu_ctxt[offset].regs[index] = value; 
+		el2_data->shadow_vcpu_ctxt[offset].regs[index] = value;
 	else if (index == V_FAR_EL2)
 		el2_data->shadow_vcpu_ctxt[offset].far_el2 = value;
 	else if (index == V_HPFAR_EL2)
@@ -346,7 +364,7 @@ static u32 inline get_shadow_ctxt_esr(u32 vmid, u32 vcpuid)
 	return el2_data->shadow_vcpu_ctxt[offset].esr;
 };
 
-static void inline set_shadow_ctxt_esr(u32 vmid, u32 vcpuid, u32 value) 
+static void inline set_shadow_ctxt_esr(u32 vmid, u32 vcpuid, u32 value)
 {
 	struct el2_data *el2_data = get_el2_data_start();
 	int offset = VCPU_IDX(vmid, vcpuid);
