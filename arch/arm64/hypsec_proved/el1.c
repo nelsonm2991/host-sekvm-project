@@ -254,6 +254,8 @@ void init_el2_data_page(void)
 	//	el2_data->smmu_cfg[i].vmid = V_INVALID;
 	//}
 
+    el2_data->s2_pagetable_set = false;
+
 	return;
 }
 

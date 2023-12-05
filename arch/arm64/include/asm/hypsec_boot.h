@@ -7,6 +7,7 @@
 #define EL2_MAX_VMID		18
 //Hostvisor:0 + 16 VMIDs + 1 COREVISOR
 #define EL2_VM_INFO_SIZE	EL2_MAX_VMID + 1
+#define COREVISOR_MEM       EL2_MAX_VMID + 2
 
 #define HYPSEC_MAX_VCPUS	4
 #define HYPSEC_MAX_CPUS		16	

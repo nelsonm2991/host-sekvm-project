@@ -177,7 +177,13 @@ void __hyp_text handle_host_hvc(struct s2_host_regs *hr)
 		//__kvm_phys_addr_ioremap((u32)get_host_reg(hr, 1), get_host_reg(hr, 2), get_host_reg(hr, 3), get_host_reg(hr, 4));
 		v_kvm_phys_addr_ioremap((u32)get_host_reg(hr, 1), get_host_reg(hr, 2), get_host_reg(hr, 3), get_host_reg(hr, 4));
 		break;
-	default:
+
+    /* Hypercall for dynamic allocation of stage 2 page tables */
+    case HVC_ALLOC_S2PAGETABLE_MEM:
+        alloc_s2_mem((u64)get_host_reg(hr, 1), (u64)get_host_reg(hr, 2));
+        break;
+
+    default:
 		print_string("\rno support hvc:\n");
 		printhex_ul(callno);
 		break;

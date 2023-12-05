@@ -140,6 +140,12 @@ struct el2_data {
 
 	u64 phys_mem_start;
 	u64 phys_mem_size;
+
+    // Used when the hostvisor passes over memory for a VM's s2 page table.
+    //
+    // Invalid once a corresponding VM_CREATE has been called.
+    u64 s2_pagetable_base;
+    u64 s2_pagetable_set;   // initialized to false in hypsec_proved/el1.c
 };
 
 void init_el2_data_page(void);

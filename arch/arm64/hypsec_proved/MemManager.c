@@ -280,3 +280,60 @@ void __hyp_text unmap_smmu_page(u32 cbndx, u32 index, u64 iova)
 	}
 	release_lock_s2page();
 }
+
+// Gives the hostvisor 4 * 2M pages to use for the stage-2 page tables of a
+// guest VM.
+//
+// This is a no-op if:
+// - The base address is not 2M-aligned
+// - The size is not equal to SZ_2M * 4
+// - This hypercall has previously been called without a corresponding VM_CREATE
+void __hyp_text alloc_s2_mem(u64 base, u64 size)
+{
+    // The kernel has identity mappings from host physical addresses to machine
+    // physical addresses, so base is already a machine physical address.
+    u64 pfn, pgno;
+    struct el2_data *el2_data;
+
+    print_string("\rHVC_ALLOC_S2PAGETABLE_MEM: Called with arguments:\n");
+    printhex_ul((unsigned long)base);
+    printhex_ul((unsigned long)size);
+
+    // Verify that base is 2M-aligned.
+    //
+    // 21 least-significant-bits should be zero for 2MB alignment.
+    if (base & 0x1FFFFF) {
+        print_string("\rHVC_HOST_ALLOC_S2PAGETABLE_MEM: base not 2M-aligned\n");
+        return;
+    }
+
+    // Verify that size is correct.
+    if (size != STAGE2_VM_POOL_SIZE) {
+        print_string("\rHVC_HOST_ALLOC_S2PAGETABLE_MEM: size not 4 * SZ_2M\n");
+        return;
+    }
+
+    // Verify that el2_data->s2_pagetable hasn't been set.
+    acquire_lock_core();
+	el2_data = get_el2_data_start();
+    if (el2_data->s2_pagetable_set) {
+        release_lock_core();
+        return; // turn this into a no-op
+    }
+    release_lock_core();
+
+    // Revoke host access to the memory used for the guest VM's s2 page table.
+    pfn = base / PAGE_SIZE;
+    for (pgno = 0; pgno < size / PAGE_SIZE; pgno++) {
+        // 0 for GFN value since this memory will stay with the corevisor.
+        assign_pfn_to_vm(COREVISOR_MEM, (u64)0, pfn + pgno);
+    }
+
+    // Store information about the region.
+    acquire_lock_core();
+    el2_data = get_el2_data_start();
+    el2_data->s2_pagetable_base = base;
+    el2_data->s2_pagetable_set = true;
+    release_lock_core();
+    print_string("\rHVC_ALLOC_S2PAGETABLE_MEM: Done\n");
+}
