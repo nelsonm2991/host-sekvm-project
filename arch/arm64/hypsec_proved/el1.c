@@ -255,6 +255,10 @@ void init_el2_data_page(void)
 	//}
 
 	// DPM additions
+	// Note: in case we want the very first page to be statically allocated
+	// so that DPM is always available after this point, you can use the
+	// same scheme as above. We just have a label for dpm_pg_start
+	// that we set just the same as above for core
 	el2_data->dpm_info.base_page_addr = 0;
 	el2_data->dpm_info.region_count = 0;
 	el2_data->dpm_info.page_count = 0;
