@@ -284,7 +284,7 @@ void __hyp_text unmap_smmu_page(u32 cbndx, u32 index, u64 iova)
 // Gives the hostvisor 4 * 2M pages to use for the stage-2 page tables of a
 // guest VM.
 //
-// This is a no-op if:
+// Kernel panic if:
 // - The base address is not 2M-aligned
 // - The size is not equal to SZ_2M * 4
 // - This hypercall has previously been called without a corresponding VM_CREATE
@@ -304,13 +304,13 @@ void __hyp_text alloc_s2_mem(u64 base, u64 size)
     // 21 least-significant-bits should be zero for 2MB alignment.
     if (base & 0x1FFFFF) {
         print_string("\rHVC_HOST_ALLOC_S2PAGETABLE_MEM: base not 2M-aligned\n");
-        return;
+        v_panic;
     }
 
     // Verify that size is correct.
     if (size != STAGE2_VM_POOL_SIZE) {
         print_string("\rHVC_HOST_ALLOC_S2PAGETABLE_MEM: size not 4 * SZ_2M\n");
-        return;
+        v_panic;
     }
 
     // Verify that el2_data->s2_pagetable hasn't been set.
@@ -318,7 +318,7 @@ void __hyp_text alloc_s2_mem(u64 base, u64 size)
 	el2_data = get_el2_data_start();
     if (el2_data->s2_pagetable_set) {
         release_lock_core();
-        return; // turn this into a no-op
+        v_panic;
     }
     release_lock_core();
 
