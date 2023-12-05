@@ -157,6 +157,9 @@ struct el2_data {
 	u64 phys_mem_start;
 	u64 phys_mem_size;
 
+	// Need: DPM lock for the linked list.
+	// We can't be modifying this list without holding the lock
+	// For simplicity, just anything dealing with DPM needs the DPM lock
 	struct dpm dpm_info;
 };
 

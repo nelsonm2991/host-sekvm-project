@@ -92,7 +92,9 @@ static u64 inline pool_start(u32 vmid) {
 		return el2_data->vm_info[vmid].page_pool_start;
 }
 
-static u64 inline pool_end(u32 vmid) {
+// Weird: commenting this out still lets everything compile, so never used?
+// There is a weird inconsistency when dealing with the corevisor here
+/*static u64 inline pool_end(u32 vmid) {
 		struct el2_data *el2_data = get_el2_data_start();
 		u64 pool_start = el2_data->vm_info[vmid].page_pool_start;
 		if (vmid == COREVISOR)
@@ -100,7 +102,7 @@ static u64 inline pool_end(u32 vmid) {
 		else if (vmid == HOSTVISOR)
 			return pool_start + STAGE2_CORE_PAGES_SIZE + STAGE2_HOST_POOL_SIZE;
 		return pool_start + PT_POOL_PER_VM;
-}
+}*/
 
 static u64 inline get_pt_next(u32 vmid) {
 	struct el2_data *el2_data = get_el2_data_start();
@@ -668,7 +670,7 @@ static u64 inline get_smmu_hyp_base(u32 num)
 	return el2_data->smmus[num].hyp_base;
 }
 
-void set_per_cpu_host_regs(u64 hr); 
+void set_per_cpu_host_regs(u64 hr);
 void set_host_regs(int nr, u64 value);
 u64 get_host_regs(int nr);
 
@@ -837,8 +839,8 @@ u32 set_boot_info(u32 vmid, u64 load_addr, u64 size);
 void remap_vm_image(u32 vmid, u64 pfn, u32 load_idx);
 void verify_and_load_images(u32 vmid);
 
-void alloc_smmu(u32 vmid, u32 cbndx, u32 index); 
-void assign_smmu(u32 vmid, u32 pfn, u32 gfn); 
+void alloc_smmu(u32 vmid, u32 cbndx, u32 index);
+void assign_smmu(u32 vmid, u32 pfn, u32 gfn);
 void map_smmu(u32 vmid, u32 cbndx, u32 index, u64 iova, u64 pte);
 void clear_smmu(u32 vmid, u32 cbndx, u32 index, u64 iova);
 void map_io(u32 vmid, u64 gpa, u64 pa);
@@ -928,7 +930,7 @@ u64 alloc_smmu_pmd_page(void);
 void init_spt(u32 cbndx, u32 index);
 u64 walk_spt(u32 cbndx, u32 index, u64 addr);
 void map_spt(u32 cbndx, u32 index, u64 addr, u64 pte);
-u64 unmap_spt(u32 cbndx, u32 index, u64 addr); 
+u64 unmap_spt(u32 cbndx, u32 index, u64 addr);
 
 /*
  * MmioPTWalk
@@ -944,4 +946,10 @@ void set_smmu_pte(u64 pmd, u64 addr, u64 pte);
 void clear_smmu_pt(u32 cbndx, u32 index);
 u64 v_walk_smmu_pt(u32 cbndx, u32 index, u64 addr);
 void v_set_smmu_pt(u32 cbndx, u32 index, u64 addr, u64 pte);
+
+/*
+ * DPM
+ */
+ u64 alloc_region(u64 start_addr_region, u64 region_size_bytes);
+ u64 reclaim_regions(u64 output_start_addr);
 #endif //HYPSEC_HYPSEC_H
