@@ -63,6 +63,9 @@
 #define HVC_SMMU_LPAE_IOVA_TO_PHYS 26
 #define HVC_SMMU_CLEAR 27
 #define	HVC_PHYS_ADDR_IOREMAP 28
+/* DPM */
+#define HVC_DPM_ALLOC_PAGES 29
+#define HVC_DPM_RECLAIM_PAGES 30
 #endif
 
 /* Error returned when an invalid stub number is passed into x0 */
