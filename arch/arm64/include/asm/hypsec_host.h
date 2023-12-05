@@ -19,6 +19,22 @@
 #define VCPU_IDX(vmid, vcpu_id) \
 	(vmid * HYPSEC_MAX_VCPUS) + vcpu_id
 
+// DPM Overall Metadata
+struct dpm {
+	u64 base_page_addr;
+	u64 region_count;
+	u64 page_count;
+};
+
+// DPM Region-specific Metadata
+struct dpm_region {
+	u64 start_addr;
+	u64 page_count;
+	u8 flags;
+	struct dpm_region* prev;
+	struct dpm_region* next;
+};
+
 struct shared_data {
 	struct kvm kvm_pool[EL2_MAX_VMID];
 	struct kvm_vcpu vcpu_pool[EL2_MAX_VMID * HYPSEC_MAX_VCPUS];
@@ -143,22 +159,6 @@ struct el2_data {
 
 	struct dpm dpm_info;
 };
-
-// DPM Overall Metadata
-struct dpm {
-	u64 base_page_addr;
-	u64 region_count;
-	u64 page_count;
-}
-
-// DPM Region-specific Metadata
-struct dpm_region {
-	u64 start_addr;
-	u64 page_count;
-	u8 flags;
-	struct dpm_region* prev;
-	struct dpm_region* next;
-}
 
 void init_el2_data_page(void);
 

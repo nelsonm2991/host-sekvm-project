@@ -1960,6 +1960,22 @@ void kvm_arch_exit(void)
 static int arm_init(void)
 {
 	int rc = kvm_init(NULL, sizeof(struct kvm_vcpu), 0, THIS_MODULE);
+
+	// ADD DPM initialization here
+	// Should alloc_pages a single page and then pass that page
+	// via the standard page-passing hypercall to DPM
+	// This page will serve as the very first page for DPM to use
+	// Note: in the future, this may need to be moved depending on which
+	// services want to use DPM. For example, if some service needs to be
+	// up a running long before this, then this original page hand off
+	// will need to be relocated to just before that
+	//
+	// Alternatively: simply have a fixed page at boot in vmlinux.lds.S
+	// that will always be used only for DPM's initialization.
+	//
+	// For now, just use the original hypercall to make everything easier
+	// and have the initilaization work as expected
+
 	return rc;
 }
 
