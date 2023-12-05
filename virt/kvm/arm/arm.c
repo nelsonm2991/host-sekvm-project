@@ -19,6 +19,8 @@
 #include <linux/kvm_irqfd.h>
 #include <linux/irqbypass.h>
 #include <linux/sched/stat.h>
+#include <linux/gfp.h>
+#include <linux/sizes.h>
 #include <trace/events/kvm.h>
 #include <kvm/arm_pmu.h>
 #include <kvm/arm_psci.h>
@@ -121,7 +123,17 @@ int kvm_arch_check_processor_compat(void)
 struct kvm* hypsec_arch_alloc_vm(void)
 {
 	struct kvm *kvm;
-	int vmid = hypsec_register_kvm();
+    struct page *s2mem;
+    int vmid;
+
+    // Pass memory to the corevisor for the VM's s2 page table.
+    //
+    // TODO: Don't hardcode this; use STAGE2_VM_POOL_SIZE instead.
+	s2mem = alloc_pages(GFP_KERNEL, 2);
+    if (s2mem)
+	    kvm_call_core(HVC_ALLOC_S2PAGETABLE_MEM, (u64)virt_to_phys(s2mem), (u64)SZ_2M * 4);
+
+    vmid = hypsec_register_kvm();
 	BUG_ON(vmid <= 0);
 	kvm = hypsec_alloc_vm(vmid);
 	kvm->arch.vmid.vmid = (u32)vmid;
