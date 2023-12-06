@@ -31,14 +31,55 @@ u64 __hyp_text alloc_region(u64 start_addr_region, u64 region_size_bytes)
   // Return successful
   // Note: we likely need a lock on the linked list for concurrent issues,
   // so add one of those to the el2_data struct to serve as the overall system lock
+  u64 res;
 
-  return 0;
+  // Verify DPM is initialized with it's first page for metadata
+  acquire_lock_core();
+  el2_data = get_el2_data_start();
+  if (el2_data->dpm_info.base_page_addr == 0 && region_size_bytes / PAGE_SIZE != 1) {
+    release_lock_core();
+    return 1;
+  }
+
+  // Setup the very first DPM metadata page
+  if (el2_data->dpm_info.base_page_addr == 0) {
+    res = init_dpm(start_addr_region);
+  }
+
+  // Treat the region as a normal region
+  else {
+    res = setup_new_region();
+  }
+
+
+  release_lock_core();
+  return res;
 }
 
 u64 __hyp_text reclaim_regions(u64 output_start_addr)
 {
   // Code here
   // Called by the host when it wants regions back from DPM
+
+  return 0;
+}
+
+u64 __hyp_text init_dpm(u64 start_addr)
+{
+  // Initialize DPM using this first page, only call with region size of 1 page
+
+  return 0;
+}
+
+u64 __hyp_text setup_new_region(u64 start_addr, u64 size_bytes)
+{
+  // Add the new region into the pool of valid regions.
+  // Make sure you have an available dpm_region struct in the metadata pages
+  // If you need another metadata page, then search for one and perform
+  // the necessary work. if you can't find one, return 1, and the
+  // hypercall retry mechanism will make a call with a region
+  // of size 1 which will then go through here and be used for metadata.
+  //
 
   return 0;
 }
