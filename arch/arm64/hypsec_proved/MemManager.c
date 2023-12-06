@@ -304,23 +304,23 @@ void __hyp_text alloc_s2_mem(u64 base, u64 size)
     // 21 least-significant-bits should be zero for 2MB alignment.
     if (base & 0x1FFFFF) {
         print_string("\rHVC_HOST_ALLOC_S2PAGETABLE_MEM: base not 2M-aligned\n");
-        v_panic;
+        __hyp_panic();
     }
 
     // Verify that size is correct.
     if (size != STAGE2_VM_POOL_SIZE) {
         print_string("\rHVC_HOST_ALLOC_S2PAGETABLE_MEM: size not 4 * SZ_2M\n");
-        v_panic;
+        __hyp_panic();
     }
 
     // Verify that el2_data->s2_pagetable hasn't been set.
-    acquire_lock_core();
+    // acquire_lock_core();
 	el2_data = get_el2_data_start();
     if (el2_data->s2_pagetable_set) {
         release_lock_core();
-        v_panic;
+        __hyp_panic();
     }
-    release_lock_core();
+    // release_lock_core();
 
     // Revoke host access to the memory used for the guest VM's s2 page table.
     pfn = base / PAGE_SIZE;
@@ -330,10 +330,10 @@ void __hyp_text alloc_s2_mem(u64 base, u64 size)
     }
 
     // Store information about the region.
-    acquire_lock_core();
-    el2_data = get_el2_data_start();
+    // acquire_lock_core();
+    // el2_data = get_el2_data_start();
     el2_data->s2_pagetable_base = base;
     el2_data->s2_pagetable_set = true;
-    release_lock_core();
+    // release_lock_core();
     print_string("\rHVC_ALLOC_S2PAGETABLE_MEM: Done\n");
 }

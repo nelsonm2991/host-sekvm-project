@@ -103,15 +103,15 @@ u32 __hyp_text register_kvm()
     struct el2_data *el2_data;
 
     /* Register memory for stage 2 page table */
-    acquire_lock_core();
+    // acquire_lock_core();
     el2_data = get_el2_data_start();
     if (!el2_data->s2_pagetable_set) {
-        release_lock_core();
-        v_panic();
+        // release_lock_core();
+        __hyp_panic();
     }
     el2_data->vm_info[vmid].page_pool_start = el2_data->s2_pagetable_base;
     el2_data->s2_pagetable_set = false;
-    release_lock_core();
+    // release_lock_core();
 
     acquire_lock_vm(vmid);
     state = get_vm_state(vmid);

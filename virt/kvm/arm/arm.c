@@ -129,9 +129,9 @@ struct kvm* hypsec_arch_alloc_vm(void)
     // Pass memory to the corevisor for the VM's s2 page table.
     //
     // TODO: Don't hardcode this; use STAGE2_VM_POOL_SIZE instead.
-	s2mem = alloc_pages(GFP_KERNEL, 2);
+	s2mem = alloc_pages(GFP_KERNEL, 11);
     if (s2mem)
-	    kvm_call_core(HVC_ALLOC_S2PAGETABLE_MEM, (u64)virt_to_phys(s2mem), (u64)SZ_2M * 4);
+	    kvm_call_core(HVC_ALLOC_S2PAGETABLE_MEM, (u64)virt_to_phys(page_address(s2mem)), (u64)SZ_2M * 4);
 
     vmid = hypsec_register_kvm();
 	BUG_ON(vmid <= 0);
