@@ -43,6 +43,8 @@ u64 __hyp_text alloc_s2pt_pmd(u32 vmid)
 	u64 next = get_pmd_next(vmid);
 	u64 end = pmd_pool_end(vmid);
 
+	// next is the first address in the page we are using. Once the first address
+	// hits the end of the region, we know we are out of pages
 	if (next + PAGE_SIZE <= end) {
 		set_pmd_next(vmid, 1);
 	}
@@ -52,6 +54,8 @@ u64 __hyp_text alloc_s2pt_pmd(u32 vmid)
 		v_panic();
 	}
 
+	// next must be the correct absolute address here, so make sure
+	// get_pmd_next and pmd_pool_end account for this.
 	return next;
 }
 

@@ -160,16 +160,60 @@ static void inline set_pud_next(u32 vmid, u64 next) {
 	el2_data->vm_info[vmid].pmd_used_pages += next;
 };
 
+// TODO: Change this to support 3 seperate pte_use_pages iterators
+// Old logic:
+// start at the pool_start
+// jump to the beginning of the pte pages region
+// Take the count of currently used pages multiply by page size, and then
+// jump that much further from there.
+// We are now looking at where the next page should go
 static u64 inline get_pmd_next(u32 vmid) {
   struct el2_data *el2_data = get_el2_data_start();
-	u64 pool_start = el2_data->vm_info[vmid].page_pool_start;
-	u64 used_pages = el2_data->vm_info[vmid].pte_used_pages;
-	return pool_start + (used_pages * PAGE_SIZE) + PMD_BASE;
+	// Corevisor and Hostvisor still use older contiguous strategy
+	if (vmid == COREVISOR || vmid == HOSTVISOR) {
+		u64 pool_start = el2_data->vm_info[vmid].page_pool_start;
+		u64 used_pages = el2_data->vm_info[vmid].pte_used_pages;
+		return pool_start + (used_pages * PAGE_SIZE) + PMD_BASE;
+	}
+
+	// Changes should only be relevant for VMs
+	u64 used_pages_one = el2_data->vm_info[vmid].pte_used_pages_one;
+	if ((used_pages_one * PAGE_SIZE) < SZ_2M) {
+		return pool_start + (used_pages_one * PAGE_SIZE) + PMD_BASE;
+	}
+
+	u64 used_pages_two = el2_data->vm_info[vmid].pte_used_pages_two;
+	if ((used_pages_two * PAGE_SIZE) < SZ_2M) {
+		return pool_start + ((used_pages_two * PAGE_SIZE) + SZ_2M) + PMD_BASE;
+	}
+
+	u64 used_pages_three = el2_data->vm_info[vmid].pte_used_pages_three;
+	return pool_start + ((used_pages_three * PAGE_SIZE) + (2 * SZ_2M)) + PMD_BASE;
 };
 
+// TODO: Change this to support 3 seperate pte_use_pages iterators
 static void inline set_pmd_next(u32 vmid, u64 next) {
   struct el2_data *el2_data = get_el2_data_start();
-	el2_data->vm_info[vmid].pte_used_pages += next;
+	if (vmid == COREVISOR || vmid == HOSTVISOR) {
+		el2_data->vm_info[vmid].pte_used_pages += next;
+		return;
+	}
+
+	// VM changes only
+	u64 used_pages_one = el2_data->vm_info[vmid].pte_used_pages_one;
+	if ((used_pages_one * PAGE_SIZE) < SZ_2M) {
+		el2_data->vm_info[vmid].pte_used_pages_one += next;
+		return;
+	}
+
+	u64 used_pages_two = el2_data->vm_info[vmid].pte_used_pages_two;
+	if ((used_pages_two * PAGE_SIZE) < SZ_2M) {
+		el2_data->vm_info[vmid].pte_used_pages_two += next;
+		return;
+	}
+
+	u64 used_pages_three = el2_data->vm_info[vmid].pte_used_pages_three;
+	el2_data->vm_info[vmid].pte_used_pages_three += next;
 };
 
 static u64 inline pgd_pool_end(u32 vmid) {
@@ -184,6 +228,7 @@ static u64 inline pud_pool_end(u32 vmid) {
 	return pool_start + PMD_BASE;
 }
 
+// TODO: change this to support 3 seperate pte iterators
 static u64 inline pmd_pool_end(u32 vmid) {
   struct el2_data *el2_data = get_el2_data_start();
 	u64 pool_start = el2_data->vm_info[vmid].page_pool_start;
@@ -191,6 +236,25 @@ static u64 inline pmd_pool_end(u32 vmid) {
 		return pool_start + STAGE2_CORE_PAGES_SIZE;
 	else if (vmid == HOSTVISOR)
 		return pool_start + STAGE2_HOST_POOL_SIZE;
+
+	// Make sure this is coordinated with get_pmd_next.
+	// If get_pmd_next and pmd_pool_end return identical values, then
+	// the host will panic. Must exhaust all 3 iterators before doing this
+	// Changes should only be relevant for VMs
+	//
+	// LEARNED: pmd_pool_end can continue using the same logic
+	// since get_pmd_next will already account for the split iterators
+	/*u64 used_pages_one = el2_data->vm_info[vmid].pte_used_pages_one;
+	if ((used_pages_one * PAGE_SIZE) < SZ_2M) {
+		return pool_start + PT_POOL_PER_VM - (2 * SZ_2M);
+	}
+
+	u64 used_pages_two = el2_data->vm_info[vmid].pte_used_pages_two;
+	if ((used_pages_two * PAGE_SIZE) < SZ_2M) {
+		return pool_start + PT_POOL_PER_VM - SZ_2M;
+	}*/
+
+	//u64 used_pages_three = el2_data->vm_info[vmid].pte_used_pages_three;
 	return pool_start + PT_POOL_PER_VM;
 }
 
@@ -668,7 +732,7 @@ static u64 inline get_smmu_hyp_base(u32 num)
 	return el2_data->smmus[num].hyp_base;
 }
 
-void set_per_cpu_host_regs(u64 hr); 
+void set_per_cpu_host_regs(u64 hr);
 void set_host_regs(int nr, u64 value);
 u64 get_host_regs(int nr);
 
@@ -837,8 +901,8 @@ u32 set_boot_info(u32 vmid, u64 load_addr, u64 size);
 void remap_vm_image(u32 vmid, u64 pfn, u32 load_idx);
 void verify_and_load_images(u32 vmid);
 
-void alloc_smmu(u32 vmid, u32 cbndx, u32 index); 
-void assign_smmu(u32 vmid, u32 pfn, u32 gfn); 
+void alloc_smmu(u32 vmid, u32 cbndx, u32 index);
+void assign_smmu(u32 vmid, u32 pfn, u32 gfn);
 void map_smmu(u32 vmid, u32 cbndx, u32 index, u64 iova, u64 pte);
 void clear_smmu(u32 vmid, u32 cbndx, u32 index, u64 iova);
 void map_io(u32 vmid, u64 gpa, u64 pa);
@@ -928,7 +992,7 @@ u64 alloc_smmu_pmd_page(void);
 void init_spt(u32 cbndx, u32 index);
 u64 walk_spt(u32 cbndx, u32 index, u64 addr);
 void map_spt(u32 cbndx, u32 index, u64 addr, u64 pte);
-u64 unmap_spt(u32 cbndx, u32 index, u64 addr); 
+u64 unmap_spt(u32 cbndx, u32 index, u64 addr);
 
 /*
  * MmioPTWalk
