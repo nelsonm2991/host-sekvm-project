@@ -170,25 +170,29 @@ static void inline set_pud_next(u32 vmid, u64 next) {
 static u64 inline get_pmd_next(u32 vmid) {
   struct el2_data *el2_data = get_el2_data_start();
 	// Corevisor and Hostvisor still use older contiguous strategy
+	u64 pool_start = el2_data->vm_info[vmid].page_pool_start;
+	u64 used_pages = el2_data->vm_info[vmid].pte_used_pages;
 	if (vmid == COREVISOR || vmid == HOSTVISOR) {
-		u64 pool_start = el2_data->vm_info[vmid].page_pool_start;
-		u64 used_pages = el2_data->vm_info[vmid].pte_used_pages;
 		return pool_start + (used_pages * PAGE_SIZE) + PMD_BASE;
 	}
 
 	// Changes should only be relevant for VMs
 	u64 used_pages_one = el2_data->vm_info[vmid].pte_used_pages_one;
+	// pte_pool_start_* already include PMD_BASE offset
+	pool_start = el2_data->vm_info[vmid].pte_pool_start_one;
 	if ((used_pages_one * PAGE_SIZE) < SZ_2M) {
-		return pool_start + (used_pages_one * PAGE_SIZE) + PMD_BASE;
+		return pool_start + (used_pages_one * PAGE_SIZE);
 	}
 
 	u64 used_pages_two = el2_data->vm_info[vmid].pte_used_pages_two;
+	pool_start = el2_data->vm_info[vmid].pte_pool_start_two;
 	if ((used_pages_two * PAGE_SIZE) < SZ_2M) {
-		return pool_start + ((used_pages_two * PAGE_SIZE) + SZ_2M) + PMD_BASE;
+		return pool_start + (used_pages_two * PAGE_SIZE);
 	}
 
 	u64 used_pages_three = el2_data->vm_info[vmid].pte_used_pages_three;
-	return pool_start + ((used_pages_three * PAGE_SIZE) + (2 * SZ_2M)) + PMD_BASE;
+	pool_start = el2_data->vm_info[vmid].pte_pool_start_three;
+	return pool_start + (used_pages_three * PAGE_SIZE);
 };
 
 // TODO: Change this to support 3 seperate pte_use_pages iterators

@@ -83,6 +83,9 @@ struct el2_vm_info {
 	unsigned long pud_used_pages;
 	unsigned long pte_used_pages; // still used for corevisor and hostvisor only
 	// Modified fragmented iterator, each pte region is SZ_2M in size
+	u64 pte_pool_start_one;
+	u64 pte_pool_start_two;
+	u64 pte_pool_start_three;
 	unsigned long pte_used_pages_one;
 	unsigned long pte_used_pages_two;
 	unsigned long pte_used_pages_three;

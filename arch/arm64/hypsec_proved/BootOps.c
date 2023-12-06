@@ -54,7 +54,7 @@ void __hyp_text set_vcpu_inactive(u32 vmid, u32 vcpuid)
 u64 __hyp_text v_search_load_info(u32 vmid, u64 addr)
 {
     u32 load_info_cnt, load_idx = -1;
-    u64 ret; 
+    u64 ret;
     acquire_lock_vm(vmid);
     load_info_cnt = get_vm_next_load_idx(vmid);
     load_idx = 0U;
@@ -72,7 +72,7 @@ u64 __hyp_text v_search_load_info(u32 vmid, u64 addr)
     }
     release_lock_vm(vmid);
     return ret;
-} 
+}
 
 u32 __hyp_text register_vcpu(u32 vmid, u32 vcpuid)
 {
@@ -89,7 +89,7 @@ u32 __hyp_text register_vcpu(u32 vmid, u32 vcpuid)
     }
     else {
 	print_string("\rregister vcpu\n");
-	v_panic(); 
+	v_panic();
     }
     release_lock_vm(vmid);
     return 0U;
@@ -100,8 +100,15 @@ u32 __hyp_text register_kvm()
     u32 vmid = gen_vmid();
     u32 state;
     u64 kvm;
+    struct el2_data *el2_data;
 
     acquire_lock_vm(vmid);
+    if (vmid != COREVISOR && vmid != HOSTVISOR) {
+        el2_data = get_el2_data_start();
+        el2_data->vm_info[vmid].pte_pool_start_one = el2_data->vm_info[vmid].page_pool_start + PMD_BASE;
+        el2_data->vm_info[vmid].pte_pool_start_two = el2_data->vm_info[vmid].pte_pool_start_one + SZ_2M;
+        el2_data->vm_info[vmid].pte_pool_start_three = el2_data->vm_info[vmid].pte_pool_start_two + SZ_2M;
+    }
     state = get_vm_state(vmid);
     if (state == UNUSED) {
         set_vm_inc_exe(vmid, 0U);
@@ -113,7 +120,7 @@ u32 __hyp_text register_kvm()
     }
     else {
 	print_string("\rregister kvm\n");
-	v_panic();        
+	v_panic();
     }
     release_lock_vm(vmid);
     return vmid;
@@ -205,15 +212,15 @@ void __hyp_text verify_and_load_images(u32 vmid)
 
 //NEW SMMU CODE
 /////////////////////////////////////////////////////////////////////////////
-void __hyp_text alloc_smmu(u32 vmid, u32 cbndx, u32 index) 
+void __hyp_text alloc_smmu(u32 vmid, u32 cbndx, u32 index)
 {
 	u32 state;
 
 	acquire_lock_vm(vmid);
-	if (HOSTVISOR < vmid && vmid < COREVISOR) 
+	if (HOSTVISOR < vmid && vmid < COREVISOR)
 	{
 		state = get_vm_state(vmid);
-		if (state == VERIFIED) 
+		if (state == VERIFIED)
 		{
 			print_string("\rpanic: alloc_smmu\n");
 			v_panic();
@@ -224,15 +231,15 @@ void __hyp_text alloc_smmu(u32 vmid, u32 cbndx, u32 index)
 	release_lock_vm(vmid);
 }
 
-void __hyp_text assign_smmu(u32 vmid, u32 pfn, u32 gfn) 
+void __hyp_text assign_smmu(u32 vmid, u32 pfn, u32 gfn)
 {
 	u32 state;
 
 	acquire_lock_vm(vmid);
-	if (HOSTVISOR < vmid && vmid < COREVISOR) 
+	if (HOSTVISOR < vmid && vmid < COREVISOR)
 	{
 		state = get_vm_state(vmid);
-		if (state == VERIFIED) 
+		if (state == VERIFIED)
 		{
 			print_string("\rpanic: assign_smmu\n");
 			v_panic();
@@ -246,10 +253,10 @@ void __hyp_text map_smmu(u32 vmid, u32 cbndx, u32 index, u64 iova, u64 pte)
 {
 	u32 state;
 	acquire_lock_vm(vmid);
-	if (HOSTVISOR < vmid && vmid < COREVISOR) 
+	if (HOSTVISOR < vmid && vmid < COREVISOR)
 	{
 		state = get_vm_state(vmid);
-		if (state == VERIFIED) 
+		if (state == VERIFIED)
 		{
 			print_string("\rpanic: map_smmu\n");
 			v_panic();
@@ -259,14 +266,14 @@ void __hyp_text map_smmu(u32 vmid, u32 cbndx, u32 index, u64 iova, u64 pte)
 	release_lock_vm(vmid);
 }
 
-void __hyp_text clear_smmu(u32 vmid, u32 cbndx, u32 index, u64 iova) 
+void __hyp_text clear_smmu(u32 vmid, u32 cbndx, u32 index, u64 iova)
 {
 	acquire_lock_vm(vmid);
-	if (HOSTVISOR < vmid && vmid < COREVISOR) 
+	if (HOSTVISOR < vmid && vmid < COREVISOR)
 	{
 		/*
 		state = get_vm_state(vmid);
-		if (state == VERIFIED) 
+		if (state == VERIFIED)
 		{
 			print_string("\rpanic: clear_smmu\n");
 			v_panic();
@@ -283,7 +290,7 @@ void __hyp_text map_io(u32 vmid, u64 gpa, u64 pa)
 
 	acquire_lock_vm(vmid);
 	state = get_vm_state(vmid);
-	//if (state == READY) 
+	//if (state == READY)
 	//{
 		__kvm_phys_addr_ioremap(vmid, gpa, pa);
 	//}
@@ -293,4 +300,4 @@ void __hyp_text map_io(u32 vmid, u64 gpa, u64 pa)
 	//	v_panic();
 	//}
 	release_lock_vm(vmid);
-} 
+}
