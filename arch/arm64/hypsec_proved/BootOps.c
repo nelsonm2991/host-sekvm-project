@@ -102,8 +102,16 @@ u32 __hyp_text register_kvm()
     u64 kvm;
     struct el2_data *el2_data;
 
+    // REQUIRED CHANGES TO SUPPORT NON-CONTIG REGION:
+    // - Add 3 parameters to this function
+    //    - pte_pool_start_one, _two, and _three
+    // For now, they still have to be contiguous but only because
+    // of this if statement. Once these 3 parameters are added, then they
+    // can be arbitrarily set and the rest of the code will work with it.
+
     acquire_lock_vm(vmid);
     if (vmid != COREVISOR && vmid != HOSTVISOR) {
+        print_string("\rRegister KVM: detected VM, setting pte_pool_starts\n");
         el2_data = get_el2_data_start();
         el2_data->vm_info[vmid].pte_pool_start_one = el2_data->vm_info[vmid].page_pool_start + PMD_BASE;
         el2_data->vm_info[vmid].pte_pool_start_two = el2_data->vm_info[vmid].pte_pool_start_one + SZ_2M;

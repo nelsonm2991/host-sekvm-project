@@ -181,17 +181,20 @@ static u64 inline get_pmd_next(u32 vmid) {
 	// pte_pool_start_* already include PMD_BASE offset
 	pool_start = el2_data->vm_info[vmid].pte_pool_start_one;
 	if ((used_pages_one * PAGE_SIZE) < SZ_2M) {
+		print_string("\rget_pmd_next: pulling from first pte pool\n");
 		return pool_start + (used_pages_one * PAGE_SIZE);
 	}
 
 	u64 used_pages_two = el2_data->vm_info[vmid].pte_used_pages_two;
 	pool_start = el2_data->vm_info[vmid].pte_pool_start_two;
 	if ((used_pages_two * PAGE_SIZE) < SZ_2M) {
+		print_string("\rget_pmd_next: pulling from second pte pool\n");
 		return pool_start + (used_pages_two * PAGE_SIZE);
 	}
 
 	u64 used_pages_three = el2_data->vm_info[vmid].pte_used_pages_three;
 	pool_start = el2_data->vm_info[vmid].pte_pool_start_three;
+	print_string("\rget_pmd_next: pulling from third pte pool\n");
 	return pool_start + (used_pages_three * PAGE_SIZE);
 };
 
@@ -206,17 +209,20 @@ static void inline set_pmd_next(u32 vmid, u64 next) {
 	// VM changes only
 	u64 used_pages_one = el2_data->vm_info[vmid].pte_used_pages_one;
 	if ((used_pages_one * PAGE_SIZE) < SZ_2M) {
+		print_string("\rset_pmd_next: incrementing first pool\n");
 		el2_data->vm_info[vmid].pte_used_pages_one += next;
 		return;
 	}
 
 	u64 used_pages_two = el2_data->vm_info[vmid].pte_used_pages_two;
 	if ((used_pages_two * PAGE_SIZE) < SZ_2M) {
+		print_string("\rset_pmd_next: incrementing second pool\n");
 		el2_data->vm_info[vmid].pte_used_pages_two += next;
 		return;
 	}
 
 	u64 used_pages_three = el2_data->vm_info[vmid].pte_used_pages_three;
+	print_string("\rset_pmd_next: incrementing third pool\n");
 	el2_data->vm_info[vmid].pte_used_pages_three += next;
 };
 

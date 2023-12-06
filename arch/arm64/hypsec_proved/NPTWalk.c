@@ -47,6 +47,10 @@ u64 __hyp_text walk_npt(u32 vmid, u64 addr)
 {
 	u64 vttbr, pgd, pud, pmd, ret, pte;
 
+	if (vmid != HOSTVISOR && vmid != COREVISOR) {
+		print_string("\rwalk_npt: npt walk for a VM, no allocM\n");
+	}
+
 	vttbr = get_pt_vttbr(vmid);
 	pgd = walk_pgd(vmid, vttbr, addr, 0U);
 	pud = walk_pud(vmid, pgd, addr, 0U);
@@ -67,12 +71,15 @@ void __hyp_text set_npt(u32 vmid, u64 addr, u32 level, u64 pte)
 {
 	u64 vttbr, pgd, pud, pmd;
 
-	vttbr = get_pt_vttbr(vmid);	
+	vttbr = get_pt_vttbr(vmid);
 	pgd = walk_pgd(vmid, vttbr, addr, 1U);
 	pud = walk_pud(vmid, pgd, addr, 1U);
 
 	if (level == 2U)
 	{
+		if (vmid != HOSTVISOR && vmid != COREVISOR) {
+			print_string("\rset_npt: VM verified to use 2 level\n");
+		}
 		pmd = walk_pmd(vmid, pud, addr, 0U);
 		if (v_pmd_table(pmd) == PMD_TYPE_TABLE) {
 			print_string("\rset existing npt: pmd\n");
@@ -82,6 +89,9 @@ void __hyp_text set_npt(u32 vmid, u64 addr, u32 level, u64 pte)
 	}
 	else
 	{
+		if (vmid != HOSTVISOR && vmid != COREVISOR) {
+			print_string("\rset_npt: VM verified to use 3 level\n");
+		}
 		pmd = walk_pmd(vmid, pud, addr, 1U);
 		if (v_pmd_table(pmd) == PMD_TYPE_TABLE)
 			v_set_pte(vmid, pmd, addr, pte);

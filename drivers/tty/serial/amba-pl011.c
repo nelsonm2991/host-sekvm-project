@@ -48,6 +48,7 @@
 #include <linux/acpi.h>
 
 #include "amba-pl011.h"
+#include <asm/hypsec_host.h>
 
 #define UART_NR			14
 
@@ -2629,6 +2630,8 @@ static int pl011_setup_port(struct device *dev, struct uart_amba_port *uap,
 			    struct resource *mmiobase, int index)
 {
 	void __iomem *base;
+       struct el2_data *el2_data = kvm_ksym_ref(el2_data_start);
+       extern bool sekvm_pl011_set;
 
 	base = devm_ioremap_resource(dev, mmiobase);
 	if (IS_ERR(base))
@@ -2651,7 +2654,9 @@ static int pl011_setup_port(struct device *dev, struct uart_amba_port *uap,
 	spin_lock_init(&uap->port.lock);
 
 	amba_ports[index] = uap;
-
+       el2_data->pl011_base = mmiobase->start;
+       printk("set pl011 base to %#llx\n", mmiobase->start);
+       sekvm_pl011_set = true;
 	return 0;
 }
 

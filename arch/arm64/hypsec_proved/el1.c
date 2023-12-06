@@ -125,13 +125,15 @@ void el2_shared_data_init(void)
 #define CORE_PMD_BASE (CORE_PUD_BASE + (PAGE_SIZE * 16))
 #define CORE_PTE_BASE SZ_2M
 //FIXME: Increase for bigger el2 stack
-#define CORE_PGD_START	(10 * PAGE_SIZE) 
+#define CORE_PGD_START (10 * PAGE_SIZE)
+bool sekvm_pl011_set = false;
 void init_el2_data_page(void)
 {
 	int i = 0, index = 0;
 	struct el2_data *el2_data;
 	struct memblock_region *r;
 	u64 pool_start;
+       u64 pl011_base = 0;
 
 	WARN_ON(sizeof(struct el2_data) >= CORE_DATA_SIZE);
 
@@ -146,10 +148,14 @@ void init_el2_data_page(void)
 	memset((void *)(stage2_pgs_start), 0, STAGE2_PAGES_SIZE);
 	__flush_dcache_area((void *)(stage2_pgs_start), STAGE2_PAGES_SIZE);
 
+       el2_data = (void *)kvm_ksym_ref(el2_data_start);
+       if (sekvm_pl011_set)
+               pl011_base = el2_data->pl011_base;
+
 	memset((void *)(kvm_ksym_ref(el2_data_start)), 0, CORE_DATA_SIZE);
 	__flush_dcache_area((void *)(el2_data_start), CORE_DATA_SIZE);
+       el2_data->pl011_base = pl011_base;
 
-	el2_data = (void *)kvm_ksym_ref(el2_data_start);
 	//el2_data = (void*)el2_data_start;
 	//printk("el2_data phys %llx to %llx\n", virt_to_phys(el2_data_start), virt_to_phys(el2_data_end));
 	//printk("el2_data %llx vs. %llx\n", el2_data_start, (void *)kvm_ksym_ref(el2_data_start));
@@ -165,12 +171,12 @@ void init_el2_data_page(void)
 			index += (r->size >> PAGE_SHIFT);
 		} else
 			el2_data->s2_memblock_info[i].index = S2_PFN_SIZE;
-		el2_data->phys_mem_size += el2_data->regions[i].size; 
+		el2_data->phys_mem_size += el2_data->regions[i].size;
 		i++;
 //		printk("memblock %i: base=%llx size=%llx\n", i, r->base, r->size);
 	}
 	el2_data->regions_cnt = i;
-	el2_data->phys_mem_start = el2_data->regions[0].base; 
+	el2_data->phys_mem_start = el2_data->regions[0].base;
 
 	printk("EL2 system phys mem start %llx end %llx\n",
 		el2_data->phys_mem_start, el2_data->phys_mem_size);
@@ -222,7 +228,7 @@ void init_el2_data_page(void)
 	/* CORE POOL -> HOSTVISOR POOL -> VM POOL */
 	el2_data->vm_info[COREVISOR].page_pool_start =
 		el2_data->page_pool_start + CORE_PGD_START;
-	el2_data->vm_info[COREVISOR].used_pages = 0;	
+	el2_data->vm_info[COREVISOR].used_pages = 0;
 
 	/* FIXME: hardcode this for now */
 	//el2_data->smmu_page_pool_start = el2_data->vm_info[EL2_VM_INFO_SIZE - 3].page_pool_start;
@@ -278,6 +284,7 @@ void init_hypsec_io(void)
 
 	if (el2_data->pl011_base == 0)
 		el2_data->pl011_base = 0xfe201000;
+       printk("EL2 set pl011_base to %#018lx\n", el2_data->pl011_base);
 	err = create_hypsec_io_mappings((phys_addr_t)el2_data->pl011_base,
 					 PAGE_SIZE,
 					 &el2_data->pl011_base);
@@ -345,7 +352,7 @@ phys_addr_t host_alloc_pgd(unsigned int num)
 
 	/* Start allocating memory from the normal page pool */
 	start = el2_data->vm_info[COREVISOR].page_pool_start;
-	end = start + CORE_PUD_BASE; 
+	end = start + CORE_PUD_BASE;
 	p_addr = (u64)start;
 
 	stage2_spin_unlock(&el2_data->abs_lock);
@@ -365,7 +372,7 @@ phys_addr_t host_alloc_pud(unsigned int num)
 
 	/* Start allocating memory from the normal page pool */
 	start = el2_data->vm_info[COREVISOR].page_pool_start;
-	end = start + CORE_PMD_BASE; 
+	end = start + CORE_PMD_BASE;
 	used_pages = el2_data->vm_info[COREVISOR].pud_used_pages;
 	p_addr = (u64)start + (PAGE_SIZE * used_pages) + CORE_PUD_BASE;
 
@@ -390,7 +397,7 @@ phys_addr_t host_alloc_pmd(unsigned int num)
 
 	/* Start allocating memory from the normal page pool */
 	start = el2_data->vm_info[COREVISOR].page_pool_start;
-	end = start + CORE_PTE_BASE; 
+	end = start + CORE_PTE_BASE;
 	used_pages = el2_data->vm_info[COREVISOR].pmd_used_pages;
 	p_addr = (u64)start + (PAGE_SIZE * used_pages) + CORE_PMD_BASE;
 
@@ -425,7 +432,7 @@ phys_addr_t host_alloc_pte(unsigned int num)
 	//printk("%s start %llx end %llx\n", __func__, start, end);
 	if (p_addr >= end)
 		BUG();
-	memset(__va(p_addr), 0, PAGE_SIZE);	
+	memset(__va(p_addr), 0, PAGE_SIZE);
 	return (phys_addr_t)p_addr;
 }
 
