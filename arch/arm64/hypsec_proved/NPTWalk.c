@@ -47,9 +47,9 @@ u64 __hyp_text walk_npt(u32 vmid, u64 addr)
 {
 	u64 vttbr, pgd, pud, pmd, ret, pte;
 
-	if (vmid != HOSTVISOR && vmid != COREVISOR) {
+	/*if (vmid != HOSTVISOR && vmid != COREVISOR) {
 		print_string("\rwalk_npt: npt walk for a VM, no allocM\n");
-	}
+	}*/
 
 	vttbr = get_pt_vttbr(vmid);
 	pgd = walk_pgd(vmid, vttbr, addr, 0U);

@@ -66,7 +66,7 @@ void __hyp_text assign_pfn_to_vm(u32 vmid, u64 gfn, u64 pfn)
 		if (count == 0U) {
 			set_pfn_owner(pfn, vmid);
 			clear_pfn_host(pfn);
-			set_pfn_map(pfn, gfn);	
+			set_pfn_map(pfn, gfn);
 		} else {
 			//pfn is mapped to a hostvisor SMMU table
 			print_string("\rassign pfn used by host smmu device\n");
@@ -146,8 +146,14 @@ void __hyp_text map_pfn_vm(u32 vmid, u64 addr, u64 pte, u32 level)
 	if (level == 2U) {
 		/* FIXME: verified code has pte = paddr | perm; */
 		pte = paddr + perm;
+		//print_string("\rPMD_TABLE_BIT, see the pte before and after\n");
+		//printhex_ul(pte);
 		pte &= ~PMD_TABLE_BIT;
+		//print_string("\rafter: \n");
+		//printhex_ul(pte);
 		size = PMD_SIZE;
+		//print_string("\rPMD_SIZE: \n");
+		//printhex_ul(size);
 	} else if (level == 3U) {
 		pte = paddr + perm;
 	}
@@ -167,7 +173,7 @@ void __hyp_text __kvm_phys_addr_ioremap(u32 vmid, u64 gpa, u64 pa)
 	acquire_lock_s2page();
 	owner = get_pfn_owner(pa >> PAGE_SHIFT);
 	// check if pfn is truly within an I/O area
-	if (owner == INVALID_MEM) 
+	if (owner == INVALID_MEM)
 		mmap_s2pt(vmid, gpa, 3U, pte);
 	release_lock_s2page();
 }
@@ -224,7 +230,7 @@ void __hyp_text assign_pfn_to_smmu(u32 vmid, u64 gfn, u64 pfn)
 	}
 	else if (owner != vmid)
 	{
-		if (owner != INVALID_MEM) { 
+		if (owner != INVALID_MEM) {
 			print_string("\rvmid\n");
 			printhex_ul(vmid);
 			print_string("\rowner\n");
@@ -265,7 +271,7 @@ void __hyp_text update_smmu_page(u32 vmid, u32 cbndx, u32 index, u64 iova, u64 p
 
 void __hyp_text unmap_smmu_page(u32 cbndx, u32 index, u64 iova)
 {
-	u64 pte, pfn; 
+	u64 pte, pfn;
 	u32 owner, count;
 
 	acquire_lock_s2page();

@@ -11,18 +11,37 @@ u64 __hyp_text walk_pgd(u32 vmid, u64 vttbr, u64 addr, u32 alloc)
     u64 ret = 0UL;
     if (vttbr_pa != 0UL) {
 	u64 pgd_idx = pgd_index(addr);
-    // potential issue: it seems that the alloc flag is not enabled
-    // in most cases
+        /*if (vmid != COREVISOR && vmid != HOSTVISOR) {
+            print_string("\rpgd_idx: \n");
+            printhex_ul(pgd_idx);
+            // Confirmed that for VM's when level is 2, pgd_idx is always 0.
+        }*/
         u64 pgd = pt_load(vmid, vttbr_pa + pgd_idx * 8UL);
+        // With VM's, pgd_idx is always zero, so pt_load is actually called as
+        // pgd = pt_load(vmid, vttbr_pa)
+        // Thus vttbr holds a pointer to the location that stores a pointer to
+        // the top of the pgd (aka the address of the pgd)
+
+        // physical address of the pgd page
         u64 pgd_pa = phys_page(pgd);
+        // if we never set anything, then pgd_pa should be 0. So the pointer
+        // at this location isn't actually set.
         if (pgd_pa == 0UL && alloc == 1U)
         {
+            // Might come back as zero, but since pgd should only be 1 page (right?)
+            // since pgd_idx is always zero, this will allocate one
 	    pgd_pa = alloc_s2pt_pgd(vmid);
+        // this is actually "allocating" a pud page that pgd then points to?
             pgd = pgd_pa | PUD_TYPE_TABLE;
+            // store the location of the pgd at the address held in vttbr.
+            // This should only happen 1 time per VM assuming pgd_idx remains 0
+            // for all VM addresses.
             pt_store(vmid, vttbr_pa + pgd_idx * 8UL, pgd);
         }
 	ret = pgd;
     }
+    // Returning the address of the top of the pgd page
+    // but with a PUD_TYPE_TABLE bit set.
     return ret;
 }
 
@@ -55,9 +74,9 @@ u64 __hyp_text walk_pmd(u32 vmid, u64 pgd, u64 addr, u32 alloc)
         u64 pmd_pa = phys_page(pmd);
         if (pmd_pa == 0UL && alloc == 1U)
         {
-            if (vmid != COREVISOR && vmid != HOSTVISOR) {
+            /*if (vmid != COREVISOR && vmid != HOSTVISOR) {
                 print_string("\rwalk_pmd: calling alloc_s2pt_pmd for a page on behalf of VM\n");
-            }
+            }*/
 	    pmd_pa = alloc_s2pt_pmd(vmid);
             pmd = pmd_pa | PMD_TYPE_TABLE;
             pt_store(vmid, pgd_pa + pmd_idx * 8UL, pmd);

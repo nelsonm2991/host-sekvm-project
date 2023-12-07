@@ -24,7 +24,7 @@ void __hyp_text __clear_vm_stage2_range(u32 vmid, u64 size)
 			u64 base = get_mem_region_base(i);
 			u64 sz = get_mem_region_size(i);
 			u64 flags = get_mem_region_flag(i);
-			if ((flags & MEMBLOCK_NOMAP) == 0) 
+			if ((flags & MEMBLOCK_NOMAP) == 0)
 				__clear_vm_range(vmid, base, sz);
 			i++;
 		}
@@ -72,8 +72,32 @@ void __hyp_text prot_and_map_vm_s2pt(u32 vmid, u64 addr, u64 pte, u32 level)
 
 	if (level == 2U) {
 		/* gfn is aligned to 2MB size */
+		// print_string("\rLevel 2 in prot_and_map_vm_s2pt, see below for PTRS_PER_PMD\n");
+		// printhex_ul(PTRS_PER_PMD);
 		gfn = gfn / PTRS_PER_PMD * PTRS_PER_PMD;
+		// print_string("\rPMD_PAGE_NUM output: \n");
 		num = PMD_PAGE_NUM;
+		// printhex_ul(num);
+		// print_string("\r\n");
+		// print_string("\rPAGE_SIZE: \n");
+		// printhex_ul(PAGE_SIZE);
+		// print_string("\raddr: \n");
+		// printhex_ul(addr);
+		// print_string("\r\n");
+		// print_string("\rBreakdown of values being considered (target_addr, pfn, gfn):\n");
+		// printhex_ul(target_addr);
+		// printhex_ul(pfn);
+		// printhex_ul(gfn);
+
+		// Print out conclusions:
+		// PTRS_PER_PMD = 0x200
+		// PMD_PAGE_NUM = 0x200
+		// PAGE_SIZE = 0x1000
+		// pfn = (target_addr >> 12 bits)
+		// gfn = (addr >> 12 bits)
+		//
+
+
 		//ret = assign_pfn_to_vm(vmid, gfn, pfn, PMD_PAGE_NUM);
 		//if (ret == 1) {
 		//	print_string("\rsplitting pmd to pte\n");
@@ -95,12 +119,22 @@ void __hyp_text prot_and_map_vm_s2pt(u32 vmid, u64 addr, u64 pte, u32 level)
 		level = 3U;
 	}
 
+	// Insight: num is the number of actual pages per VM IPA pages
+	// Since the VM in this case is seeing 2MB pages but the actual
+	// page_size is 4KB, we have to coalese the pages to some mapping
+	// Thus we need to perform 512 mappings per 2MB page
+	//
+	// We do this so the 2MB is still contiguous
 	while (num > 0UL) {
 		assign_pfn_to_vm(vmid, gfn, pfn);
 		gfn += 1UL;
 		pfn += 1UL;
 		num -= 1UL;
 	}
+
+	// for each actual page:
+	//    assign_pfn_to_vm
+	// map_pfn_vm
 
 	map_pfn_vm(vmid, addr, pte, level);
 }

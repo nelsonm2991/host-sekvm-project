@@ -6,8 +6,18 @@
 
 u64 __hyp_text alloc_s2pt_pgd(u32 vmid)
 {
+	// Some confusion:
+	// get_pgd_next seems to skip ahead somewhat and actually grab from the pud pages?
+	// so are these pud pages that pgd can then point to?
 	u64 next = get_pgd_next(vmid);
 	u64 end = pgd_pool_end(vmid);
+
+	// The VM should call this once.
+	if (vmid != COREVISOR && vmid != HOSTVISOR) {
+		print_string("\ralloc_s2pt_pgd called for a VM\n");
+		printhex_ul((u64)vmid);
+		print_string("\rVMID ^\n");
+	}
 
 	if (next + PAGE_SIZE <= end) {
 		set_pgd_next(vmid, 1);
