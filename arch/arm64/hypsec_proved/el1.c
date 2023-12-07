@@ -131,7 +131,7 @@ void init_el2_data_page(void)
 	int i = 0, index = 0;
 	struct el2_data *el2_data;
 	struct memblock_region *r;
-	u64 pool_start;
+	// u64 pool_start;
 
 	WARN_ON(sizeof(struct el2_data) >= CORE_DATA_SIZE);
 
@@ -202,10 +202,10 @@ void init_el2_data_page(void)
 
 	el2_data->vm_info[0].shadow_pt_lock.lock = 0;
 
-	pool_start = el2_data->page_pool_start + STAGE2_CORE_PAGES_SIZE + STAGE2_HOST_POOL_SIZE;
+	// pool_start = el2_data->page_pool_start + STAGE2_CORE_PAGES_SIZE + STAGE2_HOST_POOL_SIZE;
 	for (i = 1; i < EL2_VM_INFO_SIZE - 1; i++) {
-		el2_data->vm_info[i].page_pool_start =
-			pool_start + (STAGE2_VM_POOL_SIZE * (i - 1));
+		el2_data->vm_info[i].page_pool_start = 0;
+		//	pool_start + (STAGE2_VM_POOL_SIZE * (i - 1));
 //		printk("vm_info[%d].page_pool_start = %llx\n", i, __va(el2_data->vm_info[i].page_pool_start));
 		el2_data->vm_info[i].used_pages = 0;
 		//memset(__va(el2_data->vm_info[i].page_pool_start), 0, STAGE2_VM_POOL_SIZE);
@@ -493,7 +493,12 @@ void el2_decrypt_buf(u32 vmid, void *buf, uint32_t len)
 
 int hypsec_register_kvm(void)
 {
-	return kvm_call_core(HVC_REGISTER_KVM);
+    struct page *s2mem;    
+    s2mem = alloc_pages(GFP_KERNEL, 9);
+    if (s2mem)
+        return kvm_call_core(HVC_REGISTER_KVM, 0);
+    else
+        return kvm_call_core(HVC_REGISTER_KVM, (u64)virt_to_phys(page_address(s2mem)));
 }
 
 int hypsec_register_vcpu(u32 vmid, int vcpu_id)

@@ -95,11 +95,29 @@ u32 __hyp_text register_vcpu(u32 vmid, u32 vcpuid)
     return 0U;
 }
 
-u32 __hyp_text register_kvm()
+u32 __hyp_text register_kvm(u64 base)
 {
     u32 vmid = gen_vmid();
     u32 state;
-    u64 kvm;
+    u64 kvm, pfn, pgno; // index, addr, end;
+    struct el2_data *el2_data;
+
+    pfn = base / PAGE_SIZE;
+    for (pgno = 0; pgno < (SZ_2M * 1) / PAGE_SIZE; pgno++) {
+        assign_pfn_to_vm(COREVISOR, (u64)0, pfn + pgno);
+    }
+    
+    //addr = base;
+	//end = base + 4 * SZ_2M;
+	//do {
+	//	index = get_s2_page_index(addr);
+	//	set_s2_page_vmid(index, COREVISOR);
+	//	addr += PAGE_SIZE;
+	//} while (addr < end);
+    //memset((char*)base, 0, 1 * SZ_2M);
+
+    el2_data = get_el2_data_start();
+    el2_data->vm_info[vmid].page_pool_start = base;
 
     acquire_lock_vm(vmid);
     state = get_vm_state(vmid);
