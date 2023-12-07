@@ -3,6 +3,8 @@
 /*
  * Dynamic Page Manager (DPM)
  */
+ #define DPM_FLAG 0x80
+ #define ALLOC_FLAG 0x1
 
 // DPM handlers and code go in here
 u64 __hyp_text alloc_region(u64 start_addr_region, u64 region_size_bytes)
@@ -32,6 +34,7 @@ u64 __hyp_text alloc_region(u64 start_addr_region, u64 region_size_bytes)
   // Note: we likely need a lock on the linked list for concurrent issues,
   // so add one of those to the el2_data struct to serve as the overall system lock
   u64 res;
+  struct el2_data *el2_data;
 
   // Verify DPM is initialized with it's first page for metadata
   acquire_lock_core();
@@ -67,6 +70,29 @@ u64 __hyp_text reclaim_regions(u64 output_start_addr)
 u64 __hyp_text init_dpm(u64 start_addr)
 {
   // Initialize DPM using this first page, only call with region size of 1 page
+  //
+  // Verify el2_data->dpm.base_page_addr is 0
+  struct el2_data *el2_data;
+  struct dpm_region region;
+
+  el2_data = get_el2_data_start();
+  if (el2_data->dpm.base_page_addr != 0) {
+    print_string("\rinit_dpm called on already initialized DPM\n");
+    return 1;
+  }
+
+  // start_addr is beginning of very first dpm_region struct
+  // TODO: change this to just call setup_new_region after the check
+  region = (struct dpm_region*) __el2_va(start_addr);
+  region->start_addr = start_addr;
+  region->page_count = 1;
+  region->flags = 0 | DPM_FLAG | ALLOC_FLAG;
+  region->prev = region;
+  region->next = region;
+
+  el2_data->dpm.base_page_addr = start_addr;
+  el2_data->dpm.region_count = 1;
+  el2_data->dpm.page_count = 1;
 
   return 0;
 }
@@ -80,6 +106,26 @@ u64 __hyp_text setup_new_region(u64 start_addr, u64 size_bytes)
   // hypercall retry mechanism will make a call with a region
   // of size 1 which will then go through here and be used for metadata.
   //
+  struct el2_data *el2_data;
+  struct dpm_region region;
+  struct dpm_region list_head;
+
+  el2_data = get_el2_data_start();
+  list_head = (struct dpm_region*) __el2_va(el2_data->dpm.base_page_addr);
+
+  // Search the list to see if start_addr is already contained there
+  // if it is --> error, otherwise proceed
+
+  // Search the list again, but only consider regions with the DPM_FLAG set
+  // for each possible dpm_region owned by DPM metadata:
+  //   linear search for a vacant dpm_region
+  //   if none found -> return NULL
+  //   if found -> return u64 phys addr of the region
+  //
+  //   once a search call comes back non-NULL, break out of the search
+  //   if you re-encounter the list_head, then return error since it means
+  //   dpm has ran out of metadata pages and needs another 1
+
 
   return 0;
 }
