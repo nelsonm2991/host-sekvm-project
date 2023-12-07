@@ -106,6 +106,7 @@ u64 __hyp_text setup_new_region(u64 start_addr, u64 size_bytes)
   // hypercall retry mechanism will make a call with a region
   // of size 1 which will then go through here and be used for metadata.
   //
+  u64 region_pa;
   struct el2_data *el2_data;
   struct dpm_region region;
   struct dpm_region list_head;
@@ -125,7 +126,64 @@ u64 __hyp_text setup_new_region(u64 start_addr, u64 size_bytes)
   //   once a search call comes back non-NULL, break out of the search
   //   if you re-encounter the list_head, then return error since it means
   //   dpm has ran out of metadata pages and needs another 1
+  if (contains_region(start_addr, list_head)) {
+    return 1;
+  }
 
+  region_pa = find_avail_region();
+  if (!phys_page(region_pa)) {
+    return 1;
+  }
+
+  region = (struct dpm_region*) __el2_va(region_pa);
+  region->start_addr = start_addr;
+  region->page_count = size_bytes / PAGE_SIZE;
+  region->flags = 0;
+
+  insert_region(list_head, region);
 
   return 0;
+}
+
+void __hyp_text insert_region(struct dpm_region *list_head, struct dpm_region *region)
+{
+  return;
+}
+
+u64 __hyp_text find_avail_region(struct dpm_region *list_head)
+{
+  // Starting with list_head, search for a DPM metadata page, see DPM_FLAG
+  // Once found, linear search that page until you find a vacancy.
+  // If none found on that page -> keep traversing the list to the next one
+  // If found -> return the physical address of that region
+  // If you search the whole list and find nothing, then return an error
+  return 0;
+}
+
+u8 __hyp_text contains_region(u64 start_addr, struct dpm_region *list_head)
+{
+  // Planning
+  // return 0 if the start_addr is not present in the list
+  // return 1 if the start_addr is present in the list
+
+  char found = (char) 0;
+  char done = (char) 0;
+  struct dpm_region *curr;
+
+  curr = list_head;
+  while (!found && !done) {
+    if (curr.start_addr == start_addr) {
+      found = (char) 1;
+      break;
+    }
+
+    if (curr.start_addr == list_head.start_addr) {
+      done = (char) 1;
+      break;
+    }
+
+    curr = curr.next;
+  }
+
+  return (u8) found;
 }
