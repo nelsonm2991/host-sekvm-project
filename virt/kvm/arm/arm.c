@@ -129,6 +129,13 @@ struct kvm* hypsec_arch_alloc_vm(void)
 }
 #endif
 
+#ifdef CONFIG_VERIFIED_KVM
+void hypsec_arch_destroy_vm(struct kvm *kvm)
+{
+    hypsec_destroy_kvm(kvm->arch.vmid.vmid);
+}
+#endif
+
 /**
  * kvm_arch_init_vm - initializes a VM data structure
  * @kvm:	pointer to the KVM struct
@@ -290,6 +297,8 @@ void kvm_arch_free_vm(struct kvm *kvm)
 		kfree(kvm);
 	else
 		vfree(kvm);
+#else
+    hypsec_arch_destroy_vm(kvm);
 #endif
 }
 

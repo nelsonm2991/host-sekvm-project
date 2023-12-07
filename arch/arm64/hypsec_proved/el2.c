@@ -172,6 +172,10 @@ void __hyp_text handle_host_hvc(struct s2_host_regs *hr)
 		ret = (int)register_vcpu((u32)get_host_reg(hr, 1), (int)get_host_reg(hr, 2));
 		set_host_regs(0, ret);
 		break;
+    case HVC_DESTROY_KVM:
+        print_string("HVC_DESTROY_KVM hypercall called\n");
+        destroy_kvm((u32)get_host_reg(hr, 1));
+        break;
 	case HVC_PHYS_ADDR_IOREMAP:
 		//FIXME: We need to call to the new map_io function...
 		//__kvm_phys_addr_ioremap((u32)get_host_reg(hr, 1), get_host_reg(hr, 2), get_host_reg(hr, 3), get_host_reg(hr, 4));

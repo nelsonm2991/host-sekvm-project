@@ -514,6 +514,16 @@ int hypsec_register_vcpu(u32 vmid, int vcpu_id)
 	return kvm_call_core((void *)HVC_REGISTER_VCPU, vmid, vcpu_id);
 }
 
+/* Add this function so we release the memory used for the s2 page table */
+void hypsec_destroy_kvm(u32 vmid)
+{
+    struct el2_data *el2_data;
+    el2_data = (void *)kvm_ksym_ref(el2_data_start);
+
+    kvm_call_core(HVC_DESTROY_KVM, vmid);
+    __free_pages(phys_to_page(el2_data->vm_info[vmid].page_pool_start), 10);
+}
+
 /* DMA Protection */
 void el2_smmu_free_pgd(u32 cbndx, u32 num)
 {

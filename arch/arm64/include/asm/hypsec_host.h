@@ -246,6 +246,7 @@ extern void init_hypsec_io(void);
 /* VM Bootstrap */
 extern int hypsec_register_kvm(void);
 extern int hypsec_register_vcpu(u32 vmid, int vcpu_id);
+extern void hypsec_destroy_kvm(u32 vmid);
 
 extern u32 __hypsec_register_kvm(void);
 extern int __hypsec_register_vcpu(u32 vmid, int vcpu_id);
