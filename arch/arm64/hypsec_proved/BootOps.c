@@ -99,25 +99,44 @@ u32 __hyp_text register_kvm(u64 base)
 {
     u32 vmid = gen_vmid();
     u32 state;
-    u64 kvm, pfn, pgno; // index, addr, end;
+    u64 kvm, index, addr, end, owner, page_cnt = 0;
     struct el2_data *el2_data;
 
-    pfn = base / PAGE_SIZE;
-    for (pgno = 0; pgno < (SZ_2M * 1) / PAGE_SIZE; pgno++) {
-        assign_pfn_to_vm(COREVISOR, (u64)0, pfn + pgno);
+    /*** Start: Allocate memory for VM's s2 page tables ***/
+
+    print_string("register_kvm(): Called with base addr:\n");
+    printhex_ul(base);
+    if (base == 0) {
+        // Hostvisor's alloc_pages() failed.
+        __hyp_panic();
     }
-    
-    //addr = base;
-	//end = base + 4 * SZ_2M;
-	//do {
-	//	index = get_s2_page_index(addr);
-	//	set_s2_page_vmid(index, COREVISOR);
-	//	addr += PAGE_SIZE;
-	//} while (addr < end);
-    //memset((char*)base, 0, 1 * SZ_2M);
+
+    // Change the ownership of these pages to the corevisor.
+    addr = base;
+	end = base + 2 * SZ_2M;
+	do {
+	    index = get_s2_page_index(addr);
+        owner = get_s2_page_vmid(index);
+
+        if (owner != HOSTVISOR) {
+            // The hostvisor shouldn't be giving memory that belongs to the
+            // corevisor or to a VM.
+            __hyp_panic();
+        }
+
+	    set_s2_page_vmid(index, COREVISOR);
+	    addr += PAGE_SIZE;
+        ++page_cnt;
+	} while (addr < end);
+
+    print_string("register_kvm(): Assigned the following number of pages to corevisor\n");
+    printhex_ul(page_cnt);
+    // memset((char*)base, 0, 2 * SZ_2M);
 
     el2_data = get_el2_data_start();
     el2_data->vm_info[vmid].page_pool_start = base;
+
+    /*** End: Allocate memory for VM's s2 page tables ***/
 
     acquire_lock_vm(vmid);
     state = get_vm_state(vmid);

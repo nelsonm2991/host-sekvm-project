@@ -502,11 +502,11 @@ void el2_decrypt_buf(u32 vmid, void *buf, uint32_t len)
 int hypsec_register_kvm(void)
 {
     struct page *s2mem;    
-    s2mem = alloc_pages(GFP_KERNEL, 9);
+    s2mem = alloc_pages(GFP_KERNEL, 10);
     if (s2mem)
-        return kvm_call_core(HVC_REGISTER_KVM, 0);
+        return kvm_call_core(HVC_REGISTER_KVM, (u64)page_to_phys(s2mem));
     else
-        return kvm_call_core(HVC_REGISTER_KVM, (u64)virt_to_phys(page_address(s2mem)));
+        return kvm_call_core(HVC_REGISTER_KVM, 0);
 }
 
 int hypsec_register_vcpu(u32 vmid, int vcpu_id)
