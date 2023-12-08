@@ -218,6 +218,9 @@ void init_el2_data_page(void)
 		//memset(__va(el2_data->vm_info[i].page_pool_start), 0, STAGE2_VM_POOL_SIZE);
 		//FIXME: init vm_info[i].vttbr here, or VMID
 	}
+    // Size of VM's stage 2 page table is 2e10 * 4K pages.
+    // TODO: Should be 11, but alloc_pages only works for order < 11.
+    el2_data->vm_s2pagetable_size = 10;
 
 	el2_data->vm_info[HOSTVISOR].page_pool_start =
 		el2_data->page_pool_start + STAGE2_CORE_PAGES_SIZE;
@@ -501,8 +504,12 @@ void el2_decrypt_buf(u32 vmid, void *buf, uint32_t len)
 
 int hypsec_register_kvm(void)
 {
-    struct page *s2mem;    
-    s2mem = alloc_pages(GFP_KERNEL, 10);
+    struct page *s2mem;
+    struct el2_data *el2_data;
+
+    el2_data = (void *)kvm_ksym_ref(el2_data_start);
+
+    s2mem = alloc_pages(GFP_KERNEL, el2_data->vm_s2pagetable_size);
     if (s2mem)
         return kvm_call_core(HVC_REGISTER_KVM, (u64)page_to_phys(s2mem));
     else
@@ -520,8 +527,10 @@ void hypsec_destroy_kvm(u32 vmid)
     struct el2_data *el2_data;
     el2_data = (void *)kvm_ksym_ref(el2_data_start);
 
+    printk("Calling HVC_DESTROY_KVM hypercall with vmid: %d\n", vmid);
     kvm_call_core(HVC_DESTROY_KVM, vmid);
-    __free_pages(phys_to_page(el2_data->vm_info[vmid].page_pool_start), 10);
+    __free_pages(phys_to_page(el2_data->vm_info[vmid].page_pool_start),
+        el2_data->vm_s2pagetable_size);
 }
 
 /* DMA Protection */

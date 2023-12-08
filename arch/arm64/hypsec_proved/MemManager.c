@@ -282,7 +282,7 @@ void __hyp_text unmap_smmu_page(u32 cbndx, u32 index, u64 iova)
 }
 
 // Maps the memory used for the stage 2 page tables back to the hostvisor.
-void destroy_kvm(u32 vmid) {
+void __hyp_text destroy_kvm(u32 vmid) {
     struct el2_data *el2_data;
     u64 addr, end, index, owner, page_cnt = 0;
 
@@ -292,10 +292,10 @@ void destroy_kvm(u32 vmid) {
     // controlled el2_data struct.
     addr = el2_data->vm_info[vmid].page_pool_start;
 	end = addr + 2 * SZ_2M;
-    print_string("destroy_kvm(): Read base address of s2 page table memory as:\n");
+    print_string("destroy_kvm(): Read base address of s2 page table as:\n");
     printhex_ul(addr);
 	do {
-	    index = get_s2_page_index(addr);
+        index = get_s2_page_index(addr);
         owner = get_s2_page_vmid(index);
 
         if (owner != COREVISOR) {
