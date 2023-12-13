@@ -93,12 +93,20 @@ static u64 inline pool_start(u32 vmid) {
 }
 
 static u64 inline pool_end(u32 vmid) {
-		struct el2_data *el2_data = get_el2_data_start();
+		/*struct el2_data *el2_data = get_el2_data_start();
 		u64 pool_start = el2_data->vm_info[vmid].page_pool_start;
 		if (vmid == COREVISOR)
 			return pool_start + STAGE2_CORE_PAGES_SIZE;
 		else if (vmid == HOSTVISOR)
 			return pool_start + STAGE2_CORE_PAGES_SIZE + STAGE2_HOST_POOL_SIZE;
+		return pool_start + PT_POOL_PER_VM; */
+
+		struct el2_data *el2_data = get_el2_data_start();
+		u64 pool_start = el2_data->vm_info[vmid].page_pool_start;
+		if (vmid == COREVISOR)
+			return pool_start + STAGE2_CORE_PAGES_SIZE;
+		else if (vmid == HOSTVISOR)
+			return pool_start + STAGE2_HOST_POOL_SIZE;
 		return pool_start + PT_POOL_PER_VM;
 }
 
@@ -132,8 +140,11 @@ static void inline pt_store(u32 vmid, u64 addr, u64 value) {
 	*ptr = value;
 };
 
+/* Generalized s2pt iterator */
+// see get_pt_next, set_pt_next, pool_end
+
 /* for split PT pool */
-#define PGD_BASE PAGE_SIZE
+/*#define PGD_BASE PAGE_SIZE
 #define PUD_BASE (PGD_BASE + (PAGE_SIZE * 16))
 #define PMD_BASE SZ_2M
 static u64 inline get_pgd_next(u32 vmid) {
@@ -192,7 +203,7 @@ static u64 inline pmd_pool_end(u32 vmid) {
 	else if (vmid == HOSTVISOR)
 		return pool_start + STAGE2_HOST_POOL_SIZE;
 	return pool_start + PT_POOL_PER_VM;
-}
+}*/
 
 /*
 u32     get_mem_region_cnt(void);
@@ -668,7 +679,7 @@ static u64 inline get_smmu_hyp_base(u32 num)
 	return el2_data->smmus[num].hyp_base;
 }
 
-void set_per_cpu_host_regs(u64 hr); 
+void set_per_cpu_host_regs(u64 hr);
 void set_host_regs(int nr, u64 value);
 u64 get_host_regs(int nr);
 
@@ -703,9 +714,10 @@ static inline u64 get_host_reg(struct s2_host_regs *hr, u32 index)
  * PTAlloc
  */
 
-u64 alloc_s2pt_pgd(u32 vmid);
-u64 alloc_s2pt_pud(u32 vmid);
-u64 alloc_s2pt_pmd(u32 vmid);
+//u64 alloc_s2pt_pgd(u32 vmid);
+//u64 alloc_s2pt_pud(u32 vmid);
+//u64 alloc_s2pt_pmd(u32 vmid);
+u64 alloc_s2pt(u32 vmid);
 //u64 alloc_smmu_pgd_page(void);
 //u64 alloc_smmu_pmd_page(void);
 
@@ -837,8 +849,8 @@ u32 set_boot_info(u32 vmid, u64 load_addr, u64 size);
 void remap_vm_image(u32 vmid, u64 pfn, u32 load_idx);
 void verify_and_load_images(u32 vmid);
 
-void alloc_smmu(u32 vmid, u32 cbndx, u32 index); 
-void assign_smmu(u32 vmid, u32 pfn, u32 gfn); 
+void alloc_smmu(u32 vmid, u32 cbndx, u32 index);
+void assign_smmu(u32 vmid, u32 pfn, u32 gfn);
 void map_smmu(u32 vmid, u32 cbndx, u32 index, u64 iova, u64 pte);
 void clear_smmu(u32 vmid, u32 cbndx, u32 index, u64 iova);
 void map_io(u32 vmid, u64 gpa, u64 pa);
@@ -928,7 +940,7 @@ u64 alloc_smmu_pmd_page(void);
 void init_spt(u32 cbndx, u32 index);
 u64 walk_spt(u32 cbndx, u32 index, u64 addr);
 void map_spt(u32 cbndx, u32 index, u64 addr, u64 pte);
-u64 unmap_spt(u32 cbndx, u32 index, u64 addr); 
+u64 unmap_spt(u32 cbndx, u32 index, u64 addr);
 
 /*
  * MmioPTWalk

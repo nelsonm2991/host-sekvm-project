@@ -62,6 +62,7 @@ static void __hyp_text protect_el2_mem(void)
 		set_s2_page_vmid(index, COREVISOR);
 		addr += PAGE_SIZE;
 	} while (addr < end);
+	print_string("\rmade it to end of protect_el2_mem\n");
 }
 
 extern u32 __init_stage2_translation(void);

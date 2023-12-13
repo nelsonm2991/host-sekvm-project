@@ -4,7 +4,7 @@
  * PTAlloc
  */
 
-u64 __hyp_text alloc_s2pt_pgd(u32 vmid)
+/*u64 __hyp_text alloc_s2pt_pgd(u32 vmid)
 {
 	u64 next = get_pgd_next(vmid);
 	u64 end = pgd_pool_end(vmid);
@@ -48,6 +48,23 @@ u64 __hyp_text alloc_s2pt_pmd(u32 vmid)
 	}
 	else {
 	        print_string("\rwe used all s2 pmd pages\n");
+		printhex_ul(vmid);
+		v_panic();
+	}
+
+	return next;
+}*/
+
+u64 __hyp_text alloc_s2pt(u32 vmid)
+{
+	u64 next = get_pt_next(vmid);
+	u64 end = pool_end(vmid);
+
+	if (next + PAGE_SIZE <= end) {
+		set_pt_next(vmid, 1);
+	}
+	else {
+	  print_string("\rwe used all s2 pages\n");
 		printhex_ul(vmid);
 		v_panic();
 	}
