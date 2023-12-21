@@ -111,7 +111,7 @@ u32 __hyp_text register_kvm()
     struct el2_data *el2_data;
 
     acquire_lock_vm(vmid);
-
+    // Must occur before init_s2pt since init_s2pt needs the first page from the iterators
     if (vmid != COREVISOR && vmid != HOSTVISOR) {
         print_string("\rRegister KVM: detected VM, setting pte_pool_start[]\n");
         el2_data = get_el2_data_start();
@@ -132,6 +132,7 @@ u32 __hyp_text register_kvm()
         set_vm_inc_exe(vmid, 0U);
         kvm = get_shared_kvm(vmid);
         set_vm_kvm(vmid, kvm);
+        // Sets vttbr and other things
         init_s2pt(vmid);
 	set_vm_public_key(vmid);
         set_vm_state(vmid, READY);

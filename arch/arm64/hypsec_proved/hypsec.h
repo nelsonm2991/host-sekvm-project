@@ -87,19 +87,27 @@ static void inline release_lock_pt(u32 vmid) {
 		stage2_spin_unlock(&el2_data->vm_info[vmid].shadow_pt_lock);
 };
 
+// This is only called when setting the very first page for the stage2 walk.
 static u64 inline pool_start(u32 vmid) {
+		u64 start;
 		struct el2_data *el2_data = get_el2_data_start();
-		return el2_data->vm_info[vmid].page_pool_start;
+		if (vmid == HOSTVISOR || vmid == COREVISOR) {
+			return el2_data->vm_info[vmid].page_pool_start;
+		}
+
+		// Setting the VTTBR implicitly consumes the first page in the region. The HOST and CORE
+		// iterators start forward by one page due to this fact. For now, the VM iterators
+		// all still start at zero, so must increment them here.
+		//
+		// Why not just call alloc_s2pt? Can't import it, same logic though
+		start = el2_data->vm_info[vmid].s2_pool_start[0];
+		el2_data->vm_info[vmid].s2_used_pages[0] += 1;
+
+		return start;
 }
 
 static u64 inline pool_end(u32 vmid) {
-		/*struct el2_data *el2_data = get_el2_data_start();
-		u64 pool_start = el2_data->vm_info[vmid].page_pool_start;
-		if (vmid == COREVISOR)
-			return pool_start + STAGE2_CORE_PAGES_SIZE;
-		else if (vmid == HOSTVISOR)
-			return pool_start + STAGE2_CORE_PAGES_SIZE + STAGE2_HOST_POOL_SIZE;
-		return pool_start + PT_POOL_PER_VM; */
+		u64 s2_pool_index;
 
 		struct el2_data *el2_data = get_el2_data_start();
 		u64 pool_start = el2_data->vm_info[vmid].page_pool_start;
@@ -108,15 +116,17 @@ static u64 inline pool_end(u32 vmid) {
 		else if (vmid == HOSTVISOR)
 			return pool_start + STAGE2_HOST_POOL_SIZE;
 
-		// Change this to match the fragmented region logic
-		return pool_start + PT_POOL_PER_VM;
+		// Fragmented Stage2 Iterator Only for VMs
+		s2_pool_index = el2_data->vm_info[vmid].s2_pool_index;
+		pool_start = el2_data->vm_info[vmid].s2_pool_start[s2_pool_index];
+		return pool_start + S2_REGION_SIZE;
 }
 
 static u64 inline get_pt_next(u32 vmid) {
 	// the VM's page_pool_start is currently set at the corevisor boot
 	// for all VMs since it comes from a fixed memory region
 	// and NOT a VM boot.
-	u64_s2_pool_index;
+	u64 s2_pool_index;
 	u64 pool_start;
 	u64 used_pages;
 
@@ -132,10 +142,8 @@ static u64 inline get_pt_next(u32 vmid) {
 	pool_start = el2_data->vm_info[vmid].s2_pool_start[s2_pool_index];
 	used_pages = el2_data->vm_info[vmid].s2_used_pages[s2_pool_index];
 
-	// Current region could be exhausted, so advance everything if it is
-	// so the correct next is returned.
-	// set_pt_next will exhaust a region, so need to make sure next will report
-	// properly that another region exists to go into
+	// next must always report valid IF there is another region since set_pt_next
+	// will exhaust regions.
 	if ((used_pages == S2_PAGES_PER_REGION) && (s2_pool_index + 1 < NUM_S2_REGIONS)) {
 		s2_pool_index += 1;
 		el2_data->vm_info[vmid].s2_pool_index = s2_pool_index;
@@ -159,9 +167,11 @@ static void inline set_pt_next(u32 vmid, u64 next) {
 
 	// Fragmented Stage2 Iteration for VMs Only
 	else {
-
+		// get_pt_next will do the work of making sure that the s2_pool_index
+		// is pointed in the right spot since get_pt_next calls always
+		// come before set_pt_next calls.
+		el2_data->vm_info[vmid].s2_used_pages[el2_data->vm_info[vmid].s2_pool_index] += 1;
 	}
-
 };
 
 // TODO: make the following work
