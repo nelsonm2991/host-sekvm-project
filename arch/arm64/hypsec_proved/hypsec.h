@@ -107,19 +107,61 @@ static u64 inline pool_end(u32 vmid) {
 			return pool_start + STAGE2_CORE_PAGES_SIZE;
 		else if (vmid == HOSTVISOR)
 			return pool_start + STAGE2_HOST_POOL_SIZE;
+
+		// Change this to match the fragmented region logic
 		return pool_start + PT_POOL_PER_VM;
 }
 
 static u64 inline get_pt_next(u32 vmid) {
+	// the VM's page_pool_start is currently set at the corevisor boot
+	// for all VMs since it comes from a fixed memory region
+	// and NOT a VM boot.
+	u64_s2_pool_index;
+	u64 pool_start;
+	u64 used_pages;
+
 	struct el2_data *el2_data = get_el2_data_start();
-	u64 pool_start = el2_data->vm_info[vmid].page_pool_start;
-	u64 used_pages = el2_data->vm_info[vmid].used_pages;
+	if (vmid == HOSTVISOR || vmid == COREVISOR) {
+		pool_start = el2_data->vm_info[vmid].page_pool_start;
+		used_pages = el2_data->vm_info[vmid].used_pages;
+		return pool_start + used_pages * PAGE_SIZE;
+	}
+
+	// Fragmented Stage2 Iteration for VMs Only
+	s2_pool_index = el2_data->vm_info[vmid].s2_pool_index;
+	pool_start = el2_data->vm_info[vmid].s2_pool_start[s2_pool_index];
+	used_pages = el2_data->vm_info[vmid].s2_used_pages[s2_pool_index];
+
+	// Current region could be exhausted, so advance everything if it is
+	// so the correct next is returned.
+	// set_pt_next will exhaust a region, so need to make sure next will report
+	// properly that another region exists to go into
+	if ((used_pages == S2_PAGES_PER_REGION) && (s2_pool_index + 1 < NUM_S2_REGIONS)) {
+		s2_pool_index += 1;
+		el2_data->vm_info[vmid].s2_pool_index = s2_pool_index;
+		used_pages = 0;
+
+		// Debugging purposes, this case should not happen
+		if (el2_data->vm_info[vmid].s2_used_pages[s2_pool_index] != 0) {
+			print_string("\rget_pt_next: iterator advanced into region that already has used pages\n");
+		}
+	}
+
 	return pool_start + used_pages * PAGE_SIZE;
 };
 
 static void inline set_pt_next(u32 vmid, u64 next) {
   struct el2_data *el2_data = get_el2_data_start();
-	el2_data->vm_info[vmid].used_pages += next;
+
+	if (vmid == HOSTVISOR || vmid == COREVISOR) {
+		el2_data->vm_info[vmid].used_pages += next;
+	}
+
+	// Fragmented Stage2 Iteration for VMs Only
+	else {
+
+	}
+
 };
 
 // TODO: make the following work

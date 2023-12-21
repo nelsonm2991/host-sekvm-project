@@ -77,13 +77,18 @@ struct el2_vm_info {
 	uint8_t public_key[32];
 	bool powered_on;
 	/* For VM private pool */
+	// Keep these around for COREVISOR and HOSTVISOR iterators
+	// Note: the generlalized iterator only uses used_pages for the host and corevisor
+	// VMID checks should be in get_pt_next and set_pt_next
 	u64 page_pool_start;
 	unsigned long used_pages;
 	unsigned long pmd_used_pages;
 	unsigned long pud_used_pages;
 	unsigned long pte_used_pages;
-	/* For VM generalized private pool */
-	// Re-use page_pool_start, used_pages
+	/* For VM generalized, fragmented private pool */
+	unsigned long s2_used_pages[NUM_S2_REGIONS];
+	unsigned long s2_pool_start[NUM_S2_REGIONS];
+	unsigned long s2_pool_index; // which NUM S2 REGION the iterator is currently in
 };
 
 struct el2_data {
