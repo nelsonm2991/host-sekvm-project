@@ -132,6 +132,13 @@ static void inline pt_store(u32 vmid, u64 addr, u64 value) {
 	*ptr = value;
 };
 
+// Fragmented iterators and split pool
+//
+// Each level will still retain it's own set of iterators and pages will not be intermixed
+//
+// Host and Core will still use the same scheme as before since that memory is already allocated
+
+
 /* for split PT pool */
 // TODO: Same logic from general-iterator, but keep the levels split for PGD
 // to avoid some weird hardware setting at least as an experiment
@@ -139,15 +146,28 @@ static void inline pt_store(u32 vmid, u64 addr, u64 value) {
 #define PUD_BASE (PGD_BASE + (PAGE_SIZE * 16))
 #define PMD_BASE SZ_2M
 static u64 inline get_pgd_next(u32 vmid) {
+	u64 pool_start;
+	u64 used_pages;
 	struct el2_data *el2_data = get_el2_data_start();
-	u64 pool_start = el2_data->vm_info[vmid].page_pool_start;
-	u64 used_pages = el2_data->vm_info[vmid].pud_used_pages;
+	if (vmid == HOSTVISOR || vmid == COREVISOR) {
+		pool_start = el2_data->vm_info[vmid].page_pool_start;
+		used_pages = el2_data->vm_info[vmid].pud_used_pages;
+		return pool_start + (used_pages * PAGE_SIZE) + PGD_BASE;
+	}
+
+	pool_start = el2_data->vm_info[vmid].pud_pool_starts[0];
+	used_pages = el2_data->vm_info[vmid].pud_used_pages_vm[0];
 	return pool_start + (used_pages * PAGE_SIZE) + PGD_BASE;
 };
 
 static void inline set_pgd_next(u32 vmid, u64 next) {
   struct el2_data *el2_data = get_el2_data_start();
-	el2_data->vm_info[vmid].pud_used_pages += next;
+	if (vmid == HOSTVISOR || vmid == COREVISOR) {
+		el2_data->vm_info[vmid].pud_used_pages += next;
+	}
+	else {
+		el2_data->vm_info[vmid].pud_used_pages_vm[0] += next;
+	}
 };
 
 static u64 inline get_pud_next(u32 vmid) {
@@ -175,14 +195,27 @@ static void inline set_pmd_next(u32 vmid, u64 next) {
 };
 
 static u64 inline pgd_pool_end(u32 vmid) {
-  struct el2_data *el2_data = get_el2_data_start();
-	u64 pool_start = el2_data->vm_info[vmid].page_pool_start;
+	u64 pool_start;
+	struct el2_data *el2_data = get_el2_data_start();
+	if (vmid == HOSTVISOR || vmid == COREVISOR) {
+		pool_start = el2_data->vm_info[vmid].page_pool_start;
+		return pool_start + PUD_BASE;
+	}
+
+	pool_start = el2_data->vm_info[vmid].pud_pool_starts[0];
 	return pool_start + PUD_BASE;
 }
 
 static u64 inline pud_pool_end(u32 vmid) {
+	u64 pool_start;
   struct el2_data *el2_data = get_el2_data_start();
-	u64 pool_start = el2_data->vm_info[vmid].page_pool_start;
+	if (vmid == HOSTVISOR || vmid == COREVISOR) {
+		pool_start = el2_data->vm_info[vmid].page_poo_start;
+		return pool_start + PMD_BASE;
+	}
+
+	// change to use the proper logic
+	u64 pool_start = el2_data->vm_info[vmid].page_poo_start;
 	return pool_start + PMD_BASE;
 }
 

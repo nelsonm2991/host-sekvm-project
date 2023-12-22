@@ -54,7 +54,7 @@ void __hyp_text set_vcpu_inactive(u32 vmid, u32 vcpuid)
 u64 __hyp_text v_search_load_info(u32 vmid, u64 addr)
 {
     u32 load_info_cnt, load_idx = -1;
-    u64 ret; 
+    u64 ret;
     acquire_lock_vm(vmid);
     load_info_cnt = get_vm_next_load_idx(vmid);
     load_idx = 0U;
@@ -72,7 +72,7 @@ u64 __hyp_text v_search_load_info(u32 vmid, u64 addr)
     }
     release_lock_vm(vmid);
     return ret;
-} 
+}
 
 u32 __hyp_text register_vcpu(u32 vmid, u32 vcpuid)
 {
@@ -89,7 +89,7 @@ u32 __hyp_text register_vcpu(u32 vmid, u32 vcpuid)
     }
     else {
 	print_string("\rregister vcpu\n");
-	v_panic(); 
+	v_panic();
     }
     release_lock_vm(vmid);
     return 0U;
@@ -97,11 +97,67 @@ u32 __hyp_text register_vcpu(u32 vmid, u32 vcpuid)
 
 u32 __hyp_text register_kvm()
 {
+    // TODO: This function should accept physical addresses pointing to 8
+    // seperate regions. These will then be used by the iterators.
+    // The first pmd_used_pages_vm iterator starts 17 pages inside of the first 1MB page.
+    // The pgd iterator starts 1 page inside of this first 1 MB page. We must make sure
+    // the VTTBR for the VM is set to the address of this first page
+    // The remaining iterators all point to the tops of the corresponding pages they receive
     u32 vmid = gen_vmid();
     u32 state;
     u64 kvm;
+    u64 pool_start;
+    u32 pte_iter;
+    struct el2_data *el2_data;
 
     acquire_lock_vm(vmid);
+    // change this so page_pool_start is set to physical address at top of very first 1MB region
+    // passed to this function
+    pool_start = el2_data->vm_info[vmid].page_pool_start;
+
+    // https://github.com/columbia/osdi23-paper114-sekvm/blob/be2827dc1b45de10afab2462c177b902536bf5c6/arch/arm64/hypsec_proved/NPTWalk.c#L13
+    // The VTTBR for the VM is set to the pool_start for the vmid.
+    //                 vttbr_pa = pool_start(vmid);
+    // make sure the page_pool_start from above is set correctly BEFORE the init_s2pt call
+    // after this conditional as that is where VTTBR gets set
+    // TODO: set the VTTBR here
+
+    // Split iterator initialization for VMs only
+    if (vmid != HOSTVISOR && vmid != COREVISOR) {
+        // Initialize the pud_used_pages_vm, pmd, and pte arrays
+        print_string("\rregister kvm: populating _vm iterators\n");
+        el2_data->vm_info[vmid].pud_used_pages_vm[0] = 0;
+        el2_data->vm_info[vmid].pmd_used_pages_vm[0] = 0;
+        el2_data->vm_info[vmid].pmd_used_pages_vm[1] = 0;
+        for (pte_iter = 0; pte_iter < PTE_USED_ITER_COUNT; pte_iter++) {
+            el2_data->vm_info[vmid].pte_used_pages_vm[pte_iter] = 0;
+        }
+
+        // Initialize these to tops of pages, except pmd[1] which is in the middle of the first
+        // page where the first 17 pages are for the pgd
+        el2_data->vm_info[vmid].pud_pool_starts[0] = pool_start + PGD_BASE;
+        el2_data->vm_info[vmid].pmd_pool_starts[0] = pool_start + PUD_BASE;
+        // the below should point to top of a 1MB contig region
+        el2_data->vm_info[vmid].pmd_pool_starts[1] = pool_start + (SZ_2M / 2);
+        for (pte_iter = 0; pte_iter < PTE_USED_ITER_COUNT; pte_iter++) {
+            el2_data->vm_info[vmid].pte_pool_starts[pte_iter] = pool_start + SZ_2M + (pte_iter * (SZ_2M / 2));
+        }
+
+        // End calculations for use in the iterator functions
+        // calculating "ends" for each on:
+        // make sure pud_pool_starts[0] end resolves to pud_pool_starts[0] + PUD_BASE
+        // make sure pmd_pool_starts[0] end resolves to be pmd_pool_starts[0] + (SZ_2M / 2) - PUD_BASE
+        // make sure pmd_pool_starts[1] end resolves to pmd_pool_starts[1] + (SZ_2M / 2)
+        // and make sure pte_pool_starts[i] resolts to pte_pool_starts[i] + (SZ_2M / 2)
+
+        // Initialize WHICH iterator we are currently using for each level
+        // pud_pool implicitly is always the same and only has 1 iterator, so no work
+        // for it there. The other pools have 2 and 6 respectively that must be set
+        el2_data->vm_info[vmid].pud_pool_index = 0;
+        el2_data->vm_info[vmid].pmd_pool_index = 0;
+        el2_data->vm_info[vmid].pte_pool_index = 0;
+    }
+
     state = get_vm_state(vmid);
     if (state == UNUSED) {
         set_vm_inc_exe(vmid, 0U);
@@ -113,7 +169,7 @@ u32 __hyp_text register_kvm()
     }
     else {
 	print_string("\rregister kvm\n");
-	v_panic();        
+	v_panic();
     }
     release_lock_vm(vmid);
     return vmid;
@@ -205,15 +261,15 @@ void __hyp_text verify_and_load_images(u32 vmid)
 
 //NEW SMMU CODE
 /////////////////////////////////////////////////////////////////////////////
-void __hyp_text alloc_smmu(u32 vmid, u32 cbndx, u32 index) 
+void __hyp_text alloc_smmu(u32 vmid, u32 cbndx, u32 index)
 {
 	u32 state;
 
 	acquire_lock_vm(vmid);
-	if (HOSTVISOR < vmid && vmid < COREVISOR) 
+	if (HOSTVISOR < vmid && vmid < COREVISOR)
 	{
 		state = get_vm_state(vmid);
-		if (state == VERIFIED) 
+		if (state == VERIFIED)
 		{
 			print_string("\rpanic: alloc_smmu\n");
 			v_panic();
@@ -224,15 +280,15 @@ void __hyp_text alloc_smmu(u32 vmid, u32 cbndx, u32 index)
 	release_lock_vm(vmid);
 }
 
-void __hyp_text assign_smmu(u32 vmid, u32 pfn, u32 gfn) 
+void __hyp_text assign_smmu(u32 vmid, u32 pfn, u32 gfn)
 {
 	u32 state;
 
 	acquire_lock_vm(vmid);
-	if (HOSTVISOR < vmid && vmid < COREVISOR) 
+	if (HOSTVISOR < vmid && vmid < COREVISOR)
 	{
 		state = get_vm_state(vmid);
-		if (state == VERIFIED) 
+		if (state == VERIFIED)
 		{
 			print_string("\rpanic: assign_smmu\n");
 			v_panic();
@@ -246,10 +302,10 @@ void __hyp_text map_smmu(u32 vmid, u32 cbndx, u32 index, u64 iova, u64 pte)
 {
 	u32 state;
 	acquire_lock_vm(vmid);
-	if (HOSTVISOR < vmid && vmid < COREVISOR) 
+	if (HOSTVISOR < vmid && vmid < COREVISOR)
 	{
 		state = get_vm_state(vmid);
-		if (state == VERIFIED) 
+		if (state == VERIFIED)
 		{
 			print_string("\rpanic: map_smmu\n");
 			v_panic();
@@ -259,14 +315,14 @@ void __hyp_text map_smmu(u32 vmid, u32 cbndx, u32 index, u64 iova, u64 pte)
 	release_lock_vm(vmid);
 }
 
-void __hyp_text clear_smmu(u32 vmid, u32 cbndx, u32 index, u64 iova) 
+void __hyp_text clear_smmu(u32 vmid, u32 cbndx, u32 index, u64 iova)
 {
 	acquire_lock_vm(vmid);
-	if (HOSTVISOR < vmid && vmid < COREVISOR) 
+	if (HOSTVISOR < vmid && vmid < COREVISOR)
 	{
 		/*
 		state = get_vm_state(vmid);
-		if (state == VERIFIED) 
+		if (state == VERIFIED)
 		{
 			print_string("\rpanic: clear_smmu\n");
 			v_panic();
@@ -283,7 +339,7 @@ void __hyp_text map_io(u32 vmid, u64 gpa, u64 pa)
 
 	acquire_lock_vm(vmid);
 	state = get_vm_state(vmid);
-	//if (state == READY) 
+	//if (state == READY)
 	//{
 		__kvm_phys_addr_ioremap(vmid, gpa, pa);
 	//}
@@ -293,4 +349,4 @@ void __hyp_text map_io(u32 vmid, u64 gpa, u64 pa)
 	//	v_panic();
 	//}
 	release_lock_vm(vmid);
-} 
+}

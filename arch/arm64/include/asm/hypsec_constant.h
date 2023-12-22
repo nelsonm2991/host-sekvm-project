@@ -7,7 +7,7 @@
 
 #define PT_POOL_START 0x10000
 #define PT_POOL_PER_VM STAGE2_VM_POOL_SIZE
-#define MAX_VM_NUM 33 
+#define MAX_VM_NUM 33
 #define MAX_CTXT_NUM 1024
 #define MAX_LOAD_INFO_NUM 5
 /*
@@ -37,19 +37,19 @@
 #define S2_PGD_PAGES_NUM 1UL
 #define MEMBLOCK_NOMAP 1UL
 */
-/*      
+/*
  * We currently only support a 40bit IPA.
- */             
+ */
 #define KVM_PHYS_SHIFT  (40)
 #define KVM_PHYS_SIZE   (1UL << KVM_PHYS_SHIFT)
 #define KVM_PHYS_MASK   (KVM_PHYS_SIZE - 1UL)
 
 #define MAX_MMIO_ADDR 0x40000000
-#define S2_RDWR PTE_S2_RDWR 
-#define PMD_PAGE_MASK PMD_MASK 
+#define S2_RDWR PTE_S2_RDWR
+#define PMD_PAGE_MASK PMD_MASK
 
 #define S2_PTE_SHIFT PAGE_SHIFT
-#define PMD_TABLE_SHIFT PMD_SHIFT 
+#define PMD_TABLE_SHIFT PMD_SHIFT
 
 #define COREVISOR EL2_MAX_VMID
 #define HOSTVISOR 0
@@ -119,5 +119,10 @@
 #define pte_idx(addr)	pte_index(addr)
 #define v_pmd_table(pmd)	(pmd & PMD_TYPE_MASK)
 #define writable(pte) (((pte) >> 2UL) & 1UL)
+
+// Split iterator
+#define PUD_USED_ITER_COUNT 1
+#define PMD_USED_ITER_COUNT 2
+#define PTE_USED_ITER_COUNT 6
 
 #endif //HYPSEC_CONSTANTS_H
