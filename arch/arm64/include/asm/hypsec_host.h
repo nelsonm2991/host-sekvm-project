@@ -158,8 +158,6 @@ struct el2_data {
 	u64 phys_mem_start;
 	u64 phys_mem_size;
 
-    // Order used for allocating 4K pages for the s2 page table of a guest VM.
-    int vm_s2pagetable_size;
 };
 
 void init_el2_data_page(void);

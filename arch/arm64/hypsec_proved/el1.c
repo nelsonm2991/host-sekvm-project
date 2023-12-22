@@ -218,9 +218,6 @@ void init_el2_data_page(void)
 		//memset(__va(el2_data->vm_info[i].page_pool_start), 0, STAGE2_VM_POOL_SIZE);
 		//FIXME: init vm_info[i].vttbr here, or VMID
 	}
-    // Size of VM's stage 2 page table is 2e10 * 4K pages.
-    // TODO: Should be 11, but alloc_pages only works for order < 11.
-    el2_data->vm_s2pagetable_size = 10;
 
 	el2_data->vm_info[HOSTVISOR].page_pool_start =
 		el2_data->page_pool_start + STAGE2_CORE_PAGES_SIZE;
@@ -542,8 +539,17 @@ void hypsec_destroy_kvm(u32 vmid)
 
     printk("Calling HVC_DESTROY_KVM hypercall with vmid: %d\n", vmid);
     kvm_call_core(HVC_DESTROY_KVM, vmid);
-    __free_pages(phys_to_page(el2_data->vm_info[vmid].page_pool_start),
-        el2_data->vm_s2pagetable_size);
+    // TODO: This would probably be nicer as an array.
+    __free_pages(phys_to_page(el2_data->vm_info[vmid].page_pool_start), 8);
+    __free_pages(phys_to_page(el2_data->vm_info[vmid].pmd_pool_starts[1]), 8);
+    __free_pages(phys_to_page(el2_data->vm_info[vmid].pte_pool_starts[0]), 8);
+    __free_pages(phys_to_page(el2_data->vm_info[vmid].pte_pool_starts[1]), 8);
+    __free_pages(phys_to_page(el2_data->vm_info[vmid].pte_pool_starts[2]), 8);
+    __free_pages(phys_to_page(el2_data->vm_info[vmid].pte_pool_starts[3]), 8);
+    __free_pages(phys_to_page(el2_data->vm_info[vmid].pte_pool_starts[4]), 8);
+    __free_pages(phys_to_page(el2_data->vm_info[vmid].pte_pool_starts[5]), 8);
+
+    printk("Pages freed\n");
 }
 
 /* DMA Protection */
