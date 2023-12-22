@@ -157,7 +157,7 @@ static u64 inline get_pgd_next(u32 vmid) {
 
 	pool_start = el2_data->vm_info[vmid].pud_pool_starts[0];
 	used_pages = el2_data->vm_info[vmid].pud_used_pages_vm[0];
-	return pool_start + (used_pages * PAGE_SIZE) + PGD_BASE;
+	return pool_start + (used_pages * PAGE_SIZE);
 };
 
 static void inline set_pgd_next(u32 vmid, u64 next) {
@@ -171,15 +171,49 @@ static void inline set_pgd_next(u32 vmid, u64 next) {
 };
 
 static u64 inline get_pud_next(u32 vmid) {
+	u64 pool_index;
+	u64 pool_start;
+	u64 used_pages;
+
   struct el2_data *el2_data = get_el2_data_start();
-	u64 pool_start = el2_data->vm_info[vmid].page_pool_start;
-	u64 used_pages = el2_data->vm_info[vmid].pmd_used_pages;
-	return pool_start + (used_pages * PAGE_SIZE) + PUD_BASE;
+	if (vmid == HOSTVISOR || vmid == COREVISOR) {
+		pool_start = el2_data->vm_info[vmid].page_pool_start;
+		used_pages = el2_data->vm_info[vmid].pmd_used_pages;
+		return pool_start + (used_pages * PAGE_SIZE) + PUD_BASE;
+	}
+
+	// Possible to have 2 iterators here
+	pool_index = el2_data->vm_info[vmid].pmd_pool_index;
+	pool_start = el2_data->vm_info[vmid].pmd_pool_starts[pool_index];
+	used_pages = el2_data->vm_info[vmid].pmd_used_pages_vm[pool_index];
+
+	// Move forward to next iterator
+	if (pool_index == 0 && used_pages == PMD_ITER_ONE_MAX_PAGES) {
+		pool_index += 1;
+		el2_data->vm_info[vmid].pmd_pool_index = pool_index;
+
+		pool_start = el2_data->vm_info[vmid].pmd_pool_starts[pool_index];
+		used_pages = el2_data->vm_info[vmid].pmd_used_pages_vm[pool_index];
+	}
+
+	if (pool_index == 1 && used_pages == PMD_ITER_ONE_MAX_PAGES) {
+		print_string("\rpud for vm exhausted\n");
+		__hyp_panic();
+	}
+
+	return pool_start + (used_pages * PAGE_SIZE);
 };
 
 static void inline set_pud_next(u32 vmid, u64 next) {
+	u64 pool_index;
   struct el2_data *el2_data = get_el2_data_start();
-	el2_data->vm_info[vmid].pmd_used_pages += next;
+	if (vmid == HOSTVISOR || vmid == COREVISOR) {
+		el2_data->vm_info[vmid].pmd_used_pages += next;
+	}
+	else {
+		pool_index = el2_data->vm_info[vmid].pmd_pool_index;
+		el2_data->vm_info[vmid].pmd_used_pages_vm[pool_index] += next;
+	}
 };
 
 static u64 inline get_pmd_next(u32 vmid) {

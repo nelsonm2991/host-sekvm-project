@@ -85,7 +85,7 @@ struct el2_vm_info {
 	/* For VM split iterator, fragmented pages */
 	// Initialize when registering a vm, see register_kvm()
 
-	// Number of pages used inside of the current region being considered for the iterator
+	// Number of pages used inside of each region, possible some are fully consumed
 	unsigned long pud_used_pages_vm[PUD_USED_ITER_COUNT];
 	unsigned long pmd_used_pages_vm[PMD_USED_ITER_COUNT];
 	unsigned long pte_used_pages_vm[PTE_USED_ITER_COUNT];
@@ -96,9 +96,9 @@ struct el2_vm_info {
 	u64 pte_pool_starts[PTE_USED_ITER_COUNT]; // 6
 
 	// Current index into *_pool_starts that is not exhausted
-	u64 pud_pool_index;
-	u64 pmd_pool_index;
-	u64 pte_pool_index;
+	u64 pud_pool_index; // 0 always (for modularity's sake)
+	u64 pmd_pool_index; // 0 of 1
+	u64 pte_pool_index; // 0 to 5
 };
 
 struct el2_data {
