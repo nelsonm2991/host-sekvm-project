@@ -113,6 +113,7 @@ u32 __hyp_text register_kvm()
     acquire_lock_vm(vmid);
     // change this so page_pool_start is set to physical address at top of very first 1MB region
     // passed to this function
+    el2_data = get_el2_data_start();
     pool_start = el2_data->vm_info[vmid].page_pool_start;
 
     // https://github.com/columbia/osdi23-paper114-sekvm/blob/be2827dc1b45de10afab2462c177b902536bf5c6/arch/arm64/hypsec_proved/NPTWalk.c#L13
@@ -150,7 +151,7 @@ u32 __hyp_text register_kvm()
         // make sure pmd_pool_starts[1] end resolves to pmd_pool_starts[1] + (SZ_2M / 2)
         // and make sure pte_pool_starts[i] resolts to pte_pool_starts[i] + (SZ_2M / 2)
 
-        // Initialize WHICH iterator we are currently using for each level
+        // Initialize iterator we are currently using for each level
         // pud_pool implicitly is always the same and only has 1 iterator, so no work
         // for it there. The other pools have 2 and 6 respectively that must be set
         el2_data->vm_info[vmid].pud_pool_index = 0;

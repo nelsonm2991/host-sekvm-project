@@ -138,7 +138,6 @@ static void inline pt_store(u32 vmid, u64 addr, u64 value) {
 //
 // Host and Core will still use the same scheme as before since that memory is already allocated
 
-
 /* for split PT pool */
 // TODO: Same logic from general-iterator, but keep the levels split for PGD
 // to avoid some weird hardware setting at least as an experiment
@@ -276,7 +275,7 @@ static u64 inline pud_pool_end(u32 vmid) {
 	u64 pool_start;
   struct el2_data *el2_data = get_el2_data_start();
 	if (vmid == HOSTVISOR || vmid == COREVISOR) {
-		pool_start = el2_data->vm_info[vmid].page_poo_start;
+		pool_start = el2_data->vm_info[vmid].page_pool_start;
 		return pool_start + PMD_BASE;
 	}
 
@@ -289,12 +288,18 @@ static u64 inline pud_pool_end(u32 vmid) {
 }
 
 static u64 inline pmd_pool_end(u32 vmid) {
+	u64 pool_index;
+	u64 pool_start;
   struct el2_data *el2_data = get_el2_data_start();
-	u64 pool_start = el2_data->vm_info[vmid].page_pool_start;
-	if (vmid == COREVISOR)
+
+	if (vmid == COREVISOR) {
+		pool_start = el2_data->vm_info[vmid].page_pool_start;
 		return pool_start + STAGE2_CORE_PAGES_SIZE;
-	else if (vmid == HOSTVISOR)
+	}
+	else if (vmid == HOSTVISOR) {
+		pool_start = el2_data->vm_info[vmid].page_pool_start;
 		return pool_start + STAGE2_HOST_POOL_SIZE;
+	}
 
 	pool_index = el2_data->vm_info[vmid].pte_pool_index;
 	pool_start = el2_data->vm_info[vmid].pte_pool_starts[pool_index];
