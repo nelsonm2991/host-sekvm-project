@@ -30,8 +30,8 @@ void __hyp_text map_page_host(u64 addr)
 			perm = 0xfff;
 			new_pte = pfn * PAGE_SIZE + perm;
 			mmap_s2pt(HOSTVISOR, addr, 3U, new_pte);
-			print_string("\rfaults on host\n");
-			printhex_ul(addr);
+			//print_string("\rfaults on host\n");
+			//printhex_ul(addr);
 			v_panic();
 		}
 	}
@@ -279,4 +279,51 @@ void __hyp_text unmap_smmu_page(u32 cbndx, u32 index, u64 iova)
 		}
 	}
 	release_lock_s2page();
+}
+
+// Maps the memory used for the stage 2 page tables back to the hostvisor.
+void __hyp_text destroy_kvm(u32 vmid) {
+    struct el2_data *el2_data;
+    u64 addr, end, index, owner, page_cnt = 0;
+    u64 page_starts[8];     // The 8 * 1M regions we want to return to the hostvisor.
+    int i, pte_iter;
+
+    el2_data = get_el2_data_start();
+
+    // No need to sanity-check addr, because we're taking it from the EL2-
+    // controlled el2_data struct.
+    page_starts[0] = el2_data->vm_info[vmid].page_pool_start;
+    page_starts[1] = el2_data->vm_info[vmid].pmd_pool_starts[1];
+    for (pte_iter = 0; pte_iter < PTE_USED_ITER_COUNT; pte_iter++) {
+            page_starts[2 + pte_iter] = el2_data->vm_info[vmid].pte_pool_starts[pte_iter];
+    }
+
+    // Return regions to the hostvisor.
+    for (i = 0; i < 8; ++i) {
+        addr = page_starts[i];
+	    end = addr + SZ_1M;
+        print_string("destroy_kvm(): Returning memory region starting at:\n");
+        printhex_ul(addr);
+        print_string("And ending at:\n");
+        printhex_ul(end);
+
+        do {
+            index = get_s2_page_index(addr);
+            owner = get_s2_page_vmid(index);
+
+            if (owner != COREVISOR) {
+                // This memory should have been allocated to the corevisor
+                // by register_kvm().
+                __hyp_panic();
+            }
+
+	        set_s2_page_vmid(index, HOSTVISOR);
+	        addr += PAGE_SIZE;
+            ++page_cnt;
+	    } while (addr < end);
+    }
+
+    print_string("destroy_kvm(): Assigned the following number of pages "
+            "back to the hostvisor:\n");
+    printhex_ul(page_cnt);
 }

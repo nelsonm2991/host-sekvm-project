@@ -132,66 +132,178 @@ static void inline pt_store(u32 vmid, u64 addr, u64 value) {
 	*ptr = value;
 };
 
+// Fragmented iterators and split pool
+//
+// Each level will still retain it's own set of iterators and pages will not be intermixed
+//
+// Host and Core will still use the same scheme as before since that memory is already allocated
+
 /* for split PT pool */
+// TODO: Same logic from general-iterator, but keep the levels split for PGD
+// to avoid some weird hardware setting at least as an experiment
 #define PGD_BASE PAGE_SIZE
 #define PUD_BASE (PGD_BASE + (PAGE_SIZE * 16))
 #define PMD_BASE SZ_2M
 static u64 inline get_pgd_next(u32 vmid) {
+	u64 pool_start;
+	u64 used_pages;
 	struct el2_data *el2_data = get_el2_data_start();
-	u64 pool_start = el2_data->vm_info[vmid].page_pool_start;
-	u64 used_pages = el2_data->vm_info[vmid].pud_used_pages;
-	return pool_start + (used_pages * PAGE_SIZE) + PGD_BASE;
+	if (vmid == HOSTVISOR || vmid == COREVISOR) {
+		pool_start = el2_data->vm_info[vmid].page_pool_start;
+		used_pages = el2_data->vm_info[vmid].pud_used_pages;
+		return pool_start + (used_pages * PAGE_SIZE) + PGD_BASE;
+	}
+
+	pool_start = el2_data->vm_info[vmid].pud_pool_starts[0];
+	used_pages = el2_data->vm_info[vmid].pud_used_pages_vm[0];
+	return pool_start + (used_pages * PAGE_SIZE);
 };
 
 static void inline set_pgd_next(u32 vmid, u64 next) {
   struct el2_data *el2_data = get_el2_data_start();
-	el2_data->vm_info[vmid].pud_used_pages += next;
+	if (vmid == HOSTVISOR || vmid == COREVISOR) {
+		el2_data->vm_info[vmid].pud_used_pages += next;
+	}
+	else {
+		el2_data->vm_info[vmid].pud_used_pages_vm[0] += next;
+	}
 };
 
 static u64 inline get_pud_next(u32 vmid) {
+	u64 pool_index;
+	u64 pool_start;
+	u64 used_pages;
+
   struct el2_data *el2_data = get_el2_data_start();
-	u64 pool_start = el2_data->vm_info[vmid].page_pool_start;
-	u64 used_pages = el2_data->vm_info[vmid].pmd_used_pages;
-	return pool_start + (used_pages * PAGE_SIZE) + PUD_BASE;
+	if (vmid == HOSTVISOR || vmid == COREVISOR) {
+		pool_start = el2_data->vm_info[vmid].page_pool_start;
+		used_pages = el2_data->vm_info[vmid].pmd_used_pages;
+		return pool_start + (used_pages * PAGE_SIZE) + PUD_BASE;
+	}
+
+	// Possible to have 2 iterators here
+	pool_index = el2_data->vm_info[vmid].pmd_pool_index;
+	pool_start = el2_data->vm_info[vmid].pmd_pool_starts[pool_index];
+	used_pages = el2_data->vm_info[vmid].pmd_used_pages_vm[pool_index];
+
+	// Move forward to next iterator
+	if (pool_index == 0 && used_pages == PMD_ITER_ONE_MAX_PAGES) {
+		pool_index += 1;
+		el2_data->vm_info[vmid].pmd_pool_index = pool_index;
+
+		pool_start = el2_data->vm_info[vmid].pmd_pool_starts[pool_index];
+		used_pages = el2_data->vm_info[vmid].pmd_used_pages_vm[pool_index];
+	}
+
+	if (pool_index >= 1 && used_pages == PMD_ITER_ONE_MAX_PAGES) {
+		print_string("\rpud for vm exhausted\n");
+		__hyp_panic();
+	}
+
+	return pool_start + (used_pages * PAGE_SIZE);
 };
 
 static void inline set_pud_next(u32 vmid, u64 next) {
+	u64 pool_index;
   struct el2_data *el2_data = get_el2_data_start();
-	el2_data->vm_info[vmid].pmd_used_pages += next;
+	if (vmid == HOSTVISOR || vmid == COREVISOR) {
+		el2_data->vm_info[vmid].pmd_used_pages += next;
+	}
+	else {
+		pool_index = el2_data->vm_info[vmid].pmd_pool_index;
+		el2_data->vm_info[vmid].pmd_used_pages_vm[pool_index] += next;
+	}
 };
 
 static u64 inline get_pmd_next(u32 vmid) {
+	u64 pool_index;
+	u64 pool_start;
+	u64 used_pages;
   struct el2_data *el2_data = get_el2_data_start();
-	u64 pool_start = el2_data->vm_info[vmid].page_pool_start;
-	u64 used_pages = el2_data->vm_info[vmid].pte_used_pages;
-	return pool_start + (used_pages * PAGE_SIZE) + PMD_BASE;
+	if (vmid == HOSTVISOR || vmid == COREVISOR) {
+		pool_start = el2_data->vm_info[vmid].page_pool_start;
+		used_pages = el2_data->vm_info[vmid].pte_used_pages;
+		return pool_start + (used_pages * PAGE_SIZE) + PMD_BASE;
+	}
+
+	pool_index = el2_data->vm_info[vmid].pte_pool_index;
+	pool_start = el2_data->vm_info[vmid].pte_pool_starts[pool_index];
+	used_pages = el2_data->vm_info[vmid].pte_used_pages_vm[pool_index];
+
+	if (used_pages == PTE_ITER_MAX_PAGES && pool_index + 1 < PTE_USED_ITER_COUNT) {
+		pool_index += 1;
+		el2_data->vm_info[vmid].pte_pool_index = pool_index;
+
+		pool_start = el2_data->vm_info[vmid].pte_pool_starts[pool_index];
+		used_pages = el2_data->vm_info[vmid].pte_used_pages_vm[pool_index];
+	}
+
+	if (used_pages == PTE_ITER_MAX_PAGES && pool_index == PTE_USED_ITER_COUNT - 1) {
+		print_string("\rpmd for vm exhausted\n");
+		__hyp_panic();
+	}
+
+	return pool_start + (used_pages * PAGE_SIZE);
 };
 
 static void inline set_pmd_next(u32 vmid, u64 next) {
+	u64 pool_index;
   struct el2_data *el2_data = get_el2_data_start();
-	el2_data->vm_info[vmid].pte_used_pages += next;
+	if (vmid == HOSTVISOR || vmid == COREVISOR) {
+		el2_data->vm_info[vmid].pte_used_pages += next;
+	}
+	else {
+		pool_index = el2_data->vm_info[vmid].pte_pool_index;
+		el2_data->vm_info[vmid].pte_used_pages_vm[pool_index] += next;
+	}
 };
 
 static u64 inline pgd_pool_end(u32 vmid) {
-  struct el2_data *el2_data = get_el2_data_start();
-	u64 pool_start = el2_data->vm_info[vmid].page_pool_start;
+	u64 pool_start;
+	struct el2_data *el2_data = get_el2_data_start();
+	if (vmid == HOSTVISOR || vmid == COREVISOR) {
+		pool_start = el2_data->vm_info[vmid].page_pool_start;
+		return pool_start + PUD_BASE;
+	}
+
+	pool_start = el2_data->vm_info[vmid].pud_pool_starts[0];
 	return pool_start + PUD_BASE;
 }
 
 static u64 inline pud_pool_end(u32 vmid) {
+	u64 pool_index;
+	u64 pool_start;
   struct el2_data *el2_data = get_el2_data_start();
-	u64 pool_start = el2_data->vm_info[vmid].page_pool_start;
-	return pool_start + PMD_BASE;
+	if (vmid == HOSTVISOR || vmid == COREVISOR) {
+		pool_start = el2_data->vm_info[vmid].page_pool_start;
+		return pool_start + PMD_BASE;
+	}
+
+	pool_index = el2_data->vm_info[vmid].pmd_pool_index;
+	pool_start = el2_data->vm_info[vmid].pmd_pool_starts[pool_index];
+	if (pool_index == 0) {
+		return pool_start + (PMD_ITER_ONE_MAX_PAGES * PAGE_SIZE);
+	}
+	return pool_start + (PMD_ITER_TWO_MAX_PAGES * PAGE_SIZE);
 }
 
 static u64 inline pmd_pool_end(u32 vmid) {
+	u64 pool_index;
+	u64 pool_start;
   struct el2_data *el2_data = get_el2_data_start();
-	u64 pool_start = el2_data->vm_info[vmid].page_pool_start;
-	if (vmid == COREVISOR)
+
+	if (vmid == COREVISOR) {
+		pool_start = el2_data->vm_info[vmid].page_pool_start;
 		return pool_start + STAGE2_CORE_PAGES_SIZE;
-	else if (vmid == HOSTVISOR)
+	}
+	else if (vmid == HOSTVISOR) {
+		pool_start = el2_data->vm_info[vmid].page_pool_start;
 		return pool_start + STAGE2_HOST_POOL_SIZE;
-	return pool_start + PT_POOL_PER_VM;
+	}
+
+	pool_index = el2_data->vm_info[vmid].pte_pool_index;
+	pool_start = el2_data->vm_info[vmid].pte_pool_starts[pool_index];
+	return pool_start + (PTE_ITER_MAX_PAGES * PAGE_SIZE);
 }
 
 /*
@@ -668,7 +780,7 @@ static u64 inline get_smmu_hyp_base(u32 num)
 	return el2_data->smmus[num].hyp_base;
 }
 
-void set_per_cpu_host_regs(u64 hr); 
+void set_per_cpu_host_regs(u64 hr);
 void set_host_regs(int nr, u64 value);
 u64 get_host_regs(int nr);
 
@@ -832,13 +944,23 @@ u64 v_search_load_info(u32 vmid, u64 addr);
 void set_vcpu_active(u32 vmid, u32 vcpuid);
 void set_vcpu_inactive(u32 vmid, u32 vcpuid);
 u32 register_vcpu(u32 vmid, u32 vcpuid);
-u32 register_kvm(void);
+u32 register_kvm(
+    u64 pageOne,
+    u64 pageTwo,
+    u64 pageThree,
+    u64 pageFour,
+    u64 pageFive,
+    u64 pageSix,
+    u64 pageSeven,
+    u64 pageEight
+);
+void destroy_kvm(u32 vmid);
 u32 set_boot_info(u32 vmid, u64 load_addr, u64 size);
 void remap_vm_image(u32 vmid, u64 pfn, u32 load_idx);
 void verify_and_load_images(u32 vmid);
 
-void alloc_smmu(u32 vmid, u32 cbndx, u32 index); 
-void assign_smmu(u32 vmid, u32 pfn, u32 gfn); 
+void alloc_smmu(u32 vmid, u32 cbndx, u32 index);
+void assign_smmu(u32 vmid, u32 pfn, u32 gfn);
 void map_smmu(u32 vmid, u32 cbndx, u32 index, u64 iova, u64 pte);
 void clear_smmu(u32 vmid, u32 cbndx, u32 index, u64 iova);
 void map_io(u32 vmid, u64 gpa, u64 pa);
@@ -928,7 +1050,7 @@ u64 alloc_smmu_pmd_page(void);
 void init_spt(u32 cbndx, u32 index);
 u64 walk_spt(u32 cbndx, u32 index, u64 addr);
 void map_spt(u32 cbndx, u32 index, u64 addr, u64 pte);
-u64 unmap_spt(u32 cbndx, u32 index, u64 addr); 
+u64 unmap_spt(u32 cbndx, u32 index, u64 addr);
 
 /*
  * MmioPTWalk
