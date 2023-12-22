@@ -130,11 +130,11 @@ u32 __hyp_text register_kvm(u64 pageZero, u64 pageOne, u64 pageTwo, u64 pageThre
     for (i = 0; i < 8; ++i) {
         addr = page_starts[i];
 	    end = page_starts[i] + SZ_1M;
-        print_string("register_kvm(): Pre-processing memory region ");
+        print_string("register_kvm(): Pre-processing memory region:\n");
         printhex_ul(i);
-        print_string("Base address for this region is ");
+        print_string("Base address for this region is:\n");
         printhex_ul(addr);
-        print_string("End address for this region is ");
+        print_string("End address for this region is:\n");
         printhex_ul(end);
 
         if (addr == 0) {
@@ -162,7 +162,7 @@ u32 __hyp_text register_kvm(u64 pageZero, u64 pageOne, u64 pageTwo, u64 pageThre
         // memset((char*)page_starts[i], 0, 2 * SZ_1M);
     }
 
-    print_string("register_kvm(): Assigned the following number of pages to corevisor: ");
+    print_string("register_kvm(): Assigned the following number of pages to corevisor:\n");
     printhex_ul(page_cnt);
 
     /*** END: Preprocess the 8*1M regions. ***/
