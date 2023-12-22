@@ -109,7 +109,6 @@ u32 __hyp_text register_kvm(u64 pageZero, u64 pageOne, u64 pageTwo, u64 pageThre
     u32 vmid = gen_vmid();
     u32 state;
     u64 kvm, index, addr, end, owner, page_cnt = 0;
-    u64 pool_start;
     u32 pte_iter;
     struct el2_data *el2_data;
     int i;
@@ -205,7 +204,7 @@ u32 __hyp_text register_kvm(u64 pageZero, u64 pageOne, u64 pageTwo, u64 pageThre
                 // We only allocated enough memory for 6 extra 1M pages.
                 __hyp_panic();
             }
-            el2_data->vm_info[vmid].pte_pool_starts[pte_iter] = page_starts[2 + i];
+            el2_data->vm_info[vmid].pte_pool_starts[pte_iter] = page_starts[2 + pte_iter];
         }
 
         // End calculations for use in the iterator functions
