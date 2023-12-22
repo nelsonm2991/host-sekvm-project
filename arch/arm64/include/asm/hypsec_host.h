@@ -157,6 +157,9 @@ struct el2_data {
 
 	u64 phys_mem_start;
 	u64 phys_mem_size;
+
+    // Order used for allocating 4K pages for the s2 page table of a guest VM.
+    int vm_s2pagetable_size;
 };
 
 void init_el2_data_page(void);
@@ -263,6 +266,7 @@ extern void init_hypsec_io(void);
 /* VM Bootstrap */
 extern int hypsec_register_kvm(void);
 extern int hypsec_register_vcpu(u32 vmid, int vcpu_id);
+extern void hypsec_destroy_kvm(u32 vmid);
 
 extern u32 __hypsec_register_kvm(void);
 extern int __hypsec_register_vcpu(u32 vmid, int vcpu_id);
