@@ -158,7 +158,7 @@ u32 __hyp_text register_kvm(u64 pageZero, u64 pageOne, u64 pageTwo, u64 pageThre
 	    } while (addr < end);
 
         // TODO: Why doesn't memset work?
-        // memset((char*)page_starts[i], 0, 2 * SZ_1M);
+        // memset((char*)__el2_va(page_starts[i]), 0, SZ_1M);
     }
 
     print_string("register_kvm(): Assigned the following number of pages to corevisor:\n");
