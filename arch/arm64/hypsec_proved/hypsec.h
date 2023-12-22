@@ -944,7 +944,16 @@ u64 v_search_load_info(u32 vmid, u64 addr);
 void set_vcpu_active(u32 vmid, u32 vcpuid);
 void set_vcpu_inactive(u32 vmid, u32 vcpuid);
 u32 register_vcpu(u32 vmid, u32 vcpuid);
-u32 register_kvm(u64 base);
+u32 register_kvm(
+    u64 pageOne,
+    u64 pageTwo,
+    u64 pageThree,
+    u64 pageFour,
+    u64 pageFive,
+    u64 pageSix,
+    u64 pageSeven,
+    u64 pageEight
+);
 void destroy_kvm(u32 vmid);
 u32 set_boot_info(u32 vmid, u64 load_addr, u64 size);
 void remap_vm_image(u32 vmid, u64 pfn, u32 load_idx);

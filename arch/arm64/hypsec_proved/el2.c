@@ -165,7 +165,16 @@ void __hyp_text handle_host_hvc(struct s2_host_regs *hr)
 		__save_encrypted_vcpu((u32)get_host_reg(hr, 1), (int)get_host_reg(hr, 2));
 		break;*/
 	case HVC_REGISTER_KVM:
-		ret = (int)register_kvm((u64)get_host_reg(hr, 1));
+		ret = (int)register_kvm(
+            (u64)get_host_reg(hr, 1),
+            (u64)get_host_reg(hr, 2),
+            (u64)get_host_reg(hr, 3),
+            (u64)get_host_reg(hr, 4),
+            (u64)get_host_reg(hr, 5),
+            (u64)get_host_reg(hr, 6),
+            (u64)get_host_reg(hr, 7),
+            (u64)get_host_reg(hr, 8)
+        );
 		set_host_regs(0, ret);
 		break;
 	case HVC_REGISTER_VCPU:

@@ -95,10 +95,13 @@ u32 __hyp_text register_vcpu(u32 vmid, u32 vcpuid)
     return 0U;
 }
 
-u32 __hyp_text register_kvm(u64 base)
+// Takes in the addresses of 8 x 1M regions used for the stage-2 page table
+// of the guest VM. We should probably pass the addresses of an array or a
+// struct, but it seems like all existing hypercalls just use primitve types
+// so let's just follow that for now.
+u32 __hyp_text register_kvm(u64 pageZero, u64 pageOne, u64 pageTwo, u64 pageThree,
+                    u64 pageFour, u64 pageFive, u64 pageSix, u64 pageSeven)
 {
-    // TODO: This function should accept physical addresses pointing to 8
-    // seperate regions. These will then be used by the iterators.
     // The first pmd_used_pages_vm iterator starts 17 pages inside of the first 1MB page.
     // The pgd iterator starts 1 page inside of this first 1 MB page. We must make sure
     // the VTTBR for the VM is set to the address of this first page
@@ -109,53 +112,69 @@ u32 __hyp_text register_kvm(u64 base)
     u64 pool_start;
     u32 pte_iter;
     struct el2_data *el2_data;
+    int i;
 
-    /*** Start: Allocate memory for VM's s2 page tables ***/
+    // Place the addresses in an array.
+    u64 page_starts[8];
+    page_starts[0] = pageZero;
+    page_starts[1] = pageOne;
+    page_starts[2] = pageTwo;
+    page_starts[3] = pageThree;
+    page_starts[4] = pageFour;
+    page_starts[5] = pageFive;
+    page_starts[6] = pageSix;
+    page_starts[7] = pageSeven;
 
-    print_string("register_kvm(): Called with base addr:\n");
-    printhex_ul(base);
-    if (base == 0) {
-        // Hostvisor's alloc_pages() failed.
-        __hyp_panic();
-    }
+    /*** START: Preprocess the 8*1M regions. ***/
 
-    // Change the ownership of these pages to the corevisor.
-    addr = base;
-	end = base + 2 * SZ_2M;
-	do {
-	    index = get_s2_page_index(addr);
-        owner = get_s2_page_vmid(index);
+    for (i = 0; i < 8; ++i) {
+        addr = page_starts[i];
+	    end = page_starts[i] + SZ_1M;
+        print_string("register_kvm(): Pre-processing memory region ");
+        printhex_ul(i);
+        print_string("Base address for this region is ");
+        printhex_ul(addr);
+        print_string("End address for this region is ");
+        printhex_ul(end);
 
-        if (owner != HOSTVISOR) {
-            // The hostvisor shouldn't be giving memory that belongs to the
-            // corevisor or to a VM.
+        if (addr == 0) {
+            // Hostvisor's alloc_pages() failed.
             __hyp_panic();
         }
 
-	    set_s2_page_vmid(index, COREVISOR);
-	    addr += PAGE_SIZE;
-        ++page_cnt;
-	} while (addr < end);
+        // Change the ownership of these pages to the corevisor.
+        do {
+	        index = get_s2_page_index(addr);
+            owner = get_s2_page_vmid(index);
 
-    print_string("register_kvm(): Assigned the following number of pages to corevisor\n");
+            if (owner != HOSTVISOR) {
+                // The hostvisor shouldn't be giving memory that belongs to the
+                // corevisor or to a VM.
+                __hyp_panic();
+            }
+
+	        set_s2_page_vmid(index, COREVISOR);
+	        addr += PAGE_SIZE;
+            ++page_cnt;
+	    } while (addr < end);
+
+        // TODO: Why doesn't memset work?
+        // memset((char*)page_starts[i], 0, 2 * SZ_1M);
+    }
+
+    print_string("register_kvm(): Assigned the following number of pages to corevisor: ");
     printhex_ul(page_cnt);
-    // memset((char*)base, 0, 2 * SZ_2M);
 
-    el2_data = get_el2_data_start();
-    el2_data->vm_info[vmid].page_pool_start = base;
+    /*** END: Preprocess the 8*1M regions. ***/
 
-    /*** End: Allocate memory for VM's s2 page tables ***/
-
-
-
-
-
+    /*** START: Build VM's s2 page table using these regions. ***/
 
     acquire_lock_vm(vmid);
+
     // change this so page_pool_start is set to physical address at top of very first 1MB region
     // passed to this function
     el2_data = get_el2_data_start();
-    pool_start = el2_data->vm_info[vmid].page_pool_start;
+    el2_data->vm_info[vmid].page_pool_start = page_starts[0];
 
     // https://github.com/columbia/osdi23-paper114-sekvm/blob/be2827dc1b45de10afab2462c177b902536bf5c6/arch/arm64/hypsec_proved/NPTWalk.c#L13
     // The VTTBR for the VM is set to the pool_start for the vmid.
@@ -177,12 +196,16 @@ u32 __hyp_text register_kvm(u64 base)
 
         // Initialize these to tops of pages, except pmd[1] which is in the middle of the first
         // page where the first 17 pages are for the pgd
-        el2_data->vm_info[vmid].pud_pool_starts[0] = pool_start + PGD_BASE;
-        el2_data->vm_info[vmid].pmd_pool_starts[0] = pool_start + PUD_BASE;
+        el2_data->vm_info[vmid].pud_pool_starts[0] = page_starts[0] + PGD_BASE;
+        el2_data->vm_info[vmid].pmd_pool_starts[0] = page_starts[0] + PUD_BASE;
         // the below should point to top of a 1MB contig region
-        el2_data->vm_info[vmid].pmd_pool_starts[1] = pool_start + (SZ_2M / 2);
+        el2_data->vm_info[vmid].pmd_pool_starts[1] = page_starts[1];
         for (pte_iter = 0; pte_iter < PTE_USED_ITER_COUNT; pte_iter++) {
-            el2_data->vm_info[vmid].pte_pool_starts[pte_iter] = pool_start + SZ_2M + (pte_iter * (SZ_2M / 2));
+            if (pte_iter > 5) {
+                // We only allocated enough memory for 6 extra 1M pages.
+                __hyp_panic();
+            }
+            el2_data->vm_info[vmid].pte_pool_starts[pte_iter] = page_starts[2 + i];
         }
 
         // End calculations for use in the iterator functions
@@ -199,6 +222,8 @@ u32 __hyp_text register_kvm(u64 base)
         el2_data->vm_info[vmid].pmd_pool_index = 0;
         el2_data->vm_info[vmid].pte_pool_index = 0;
     }
+
+    /*** END: Build VM's s2 page table using these regions. ***/
 
     state = get_vm_state(vmid);
     if (state == UNUSED) {

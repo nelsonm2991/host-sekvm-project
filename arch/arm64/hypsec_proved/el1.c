@@ -506,14 +506,27 @@ int hypsec_register_kvm(void)
 {
     struct page *s2mem;
     struct el2_data *el2_data;
+    bool success = true;
+    u64 page_starts[8];
+    int i;
 
     el2_data = (void *)kvm_ksym_ref(el2_data_start);
+    // 2e8 x 4KB pages = 1MB memory region
+    // Give the corevisor 8 x 1MB memory regions for the VM's stage 2 page table.
+    for (i = 0; i < 8; ++i) {
+        s2mem = alloc_pages(GFP_KERNEL, 8);
+        if (!s2mem) {
+            success = false;
+            break;
+        }
+        page_starts[i] = (u64)page_to_phys(s2mem);
+    }
 
-    s2mem = alloc_pages(GFP_KERNEL, el2_data->vm_s2pagetable_size);
-    if (s2mem)
-        return kvm_call_core(HVC_REGISTER_KVM, (u64)page_to_phys(s2mem));
-    else
-        return kvm_call_core(HVC_REGISTER_KVM, 0);
+    if (!success) {
+        return kvm_call_core(HVC_REGISTER_KVM, 0, 0, 0, 0, 0, 0, 0, 0);
+    } else {
+        return kvm_call_core(HVC_REGISTER_KVM, page_starts[0], page_starts[1], page_starts[2], page_starts[3], page_starts[4], page_starts[5], page_starts[6], page_starts[7]);
+    }
 }
 
 int hypsec_register_vcpu(u32 vmid, int vcpu_id)
