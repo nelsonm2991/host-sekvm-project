@@ -125,13 +125,15 @@ void el2_shared_data_init(void)
 #define CORE_PMD_BASE (CORE_PUD_BASE + (PAGE_SIZE * 16))
 #define CORE_PTE_BASE SZ_2M
 //FIXME: Increase for bigger el2 stack
-#define CORE_PGD_START	(10 * PAGE_SIZE) 
+#define CORE_PGD_START (10 * PAGE_SIZE)
+bool sekvm_pl011_set = false;
 void init_el2_data_page(void)
 {
 	int i = 0, index = 0;
 	struct el2_data *el2_data;
 	struct memblock_region *r;
-	u64 pool_start;
+	// u64 pool_start;
+    u64 pl011_base = 0;
 
 	WARN_ON(sizeof(struct el2_data) >= CORE_DATA_SIZE);
 
@@ -146,10 +148,15 @@ void init_el2_data_page(void)
 	memset((void *)(stage2_pgs_start), 0, STAGE2_PAGES_SIZE);
 	__flush_dcache_area((void *)(stage2_pgs_start), STAGE2_PAGES_SIZE);
 
+    el2_data = (void *)kvm_ksym_ref(el2_data_start);
+    if (sekvm_pl011_set)
+        pl011_base = el2_data->pl011_base;
+
 	memset((void *)(kvm_ksym_ref(el2_data_start)), 0, CORE_DATA_SIZE);
 	__flush_dcache_area((void *)(el2_data_start), CORE_DATA_SIZE);
+    el2_data->pl011_base = pl011_base;
 
-	el2_data = (void *)kvm_ksym_ref(el2_data_start);
+	// el2_data = (void *)kvm_ksym_ref(el2_data_start);
 	//el2_data = (void*)el2_data_start;
 	//printk("el2_data phys %llx to %llx\n", virt_to_phys(el2_data_start), virt_to_phys(el2_data_end));
 	//printk("el2_data %llx vs. %llx\n", el2_data_start, (void *)kvm_ksym_ref(el2_data_start));
@@ -202,10 +209,10 @@ void init_el2_data_page(void)
 
 	el2_data->vm_info[0].shadow_pt_lock.lock = 0;
 
-	pool_start = el2_data->page_pool_start + STAGE2_CORE_PAGES_SIZE + STAGE2_HOST_POOL_SIZE;
+	// pool_start = el2_data->page_pool_start + STAGE2_CORE_PAGES_SIZE + STAGE2_HOST_POOL_SIZE;
 	for (i = 1; i < EL2_VM_INFO_SIZE - 1; i++) {
-		el2_data->vm_info[i].page_pool_start =
-			pool_start + (STAGE2_VM_POOL_SIZE * (i - 1));
+		el2_data->vm_info[i].page_pool_start = 0;
+		//	pool_start + (STAGE2_VM_POOL_SIZE * (i - 1));
 //		printk("vm_info[%d].page_pool_start = %llx\n", i, __va(el2_data->vm_info[i].page_pool_start));
 		el2_data->vm_info[i].used_pages = 0;
 		//memset(__va(el2_data->vm_info[i].page_pool_start), 0, STAGE2_VM_POOL_SIZE);
@@ -278,7 +285,8 @@ void init_hypsec_io(void)
 
 	if (el2_data->pl011_base == 0)
 		el2_data->pl011_base = 0xfe201000;
-	err = create_hypsec_io_mappings((phys_addr_t)el2_data->pl011_base,
+	printk("EL2 set pl011_base to %#018lx\n", el2_data->pl011_base);
+    err = create_hypsec_io_mappings((phys_addr_t)el2_data->pl011_base,
 					 PAGE_SIZE,
 					 &el2_data->pl011_base);
 	if (err) {
@@ -493,7 +501,12 @@ void el2_decrypt_buf(u32 vmid, void *buf, uint32_t len)
 
 int hypsec_register_kvm(void)
 {
-	return kvm_call_core(HVC_REGISTER_KVM);
+    struct page *s2mem;    
+    s2mem = alloc_pages(GFP_KERNEL, 10);
+    if (s2mem)
+        return kvm_call_core(HVC_REGISTER_KVM, (u64)page_to_phys(s2mem));
+    else
+        return kvm_call_core(HVC_REGISTER_KVM, 0);
 }
 
 int hypsec_register_vcpu(u32 vmid, int vcpu_id)

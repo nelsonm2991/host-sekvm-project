@@ -30,8 +30,8 @@ void __hyp_text map_page_host(u64 addr)
 			perm = 0xfff;
 			new_pte = pfn * PAGE_SIZE + perm;
 			mmap_s2pt(HOSTVISOR, addr, 3U, new_pte);
-			print_string("\rfaults on host\n");
-			printhex_ul(addr);
+			//print_string("\rfaults on host\n");
+			//printhex_ul(addr);
 			v_panic();
 		}
 	}

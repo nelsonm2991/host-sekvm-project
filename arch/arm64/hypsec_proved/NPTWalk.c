@@ -74,7 +74,7 @@ void __hyp_text set_npt(u32 vmid, u64 addr, u32 level, u64 pte)
 	if (level == 2U)
 	{
 		pmd = walk_pmd(vmid, pud, addr, 0U);
-		if (v_pmd_table(pmd) == PMD_TYPE_TABLE) {
+		if (v_pmd_table(pmd) == PMD_TYPE_TABLE && phys_page(addr)) {
 			print_string("\rset existing npt: pmd\n");
 			v_panic();
 		} else

@@ -95,7 +95,7 @@ u32 __hyp_text register_vcpu(u32 vmid, u32 vcpuid)
     return 0U;
 }
 
-u32 __hyp_text register_kvm()
+u32 __hyp_text register_kvm(u64 base)
 {
     // TODO: This function should accept physical addresses pointing to 8
     // seperate regions. These will then be used by the iterators.
@@ -105,10 +105,51 @@ u32 __hyp_text register_kvm()
     // The remaining iterators all point to the tops of the corresponding pages they receive
     u32 vmid = gen_vmid();
     u32 state;
-    u64 kvm;
+    u64 kvm, index, addr, end, owner, page_cnt = 0;
     u64 pool_start;
     u32 pte_iter;
     struct el2_data *el2_data;
+
+    /*** Start: Allocate memory for VM's s2 page tables ***/
+
+    print_string("register_kvm(): Called with base addr:\n");
+    printhex_ul(base);
+    if (base == 0) {
+        // Hostvisor's alloc_pages() failed.
+        __hyp_panic();
+    }
+
+    // Change the ownership of these pages to the corevisor.
+    addr = base;
+	end = base + 2 * SZ_2M;
+	do {
+	    index = get_s2_page_index(addr);
+        owner = get_s2_page_vmid(index);
+
+        if (owner != HOSTVISOR) {
+            // The hostvisor shouldn't be giving memory that belongs to the
+            // corevisor or to a VM.
+            __hyp_panic();
+        }
+
+	    set_s2_page_vmid(index, COREVISOR);
+	    addr += PAGE_SIZE;
+        ++page_cnt;
+	} while (addr < end);
+
+    print_string("register_kvm(): Assigned the following number of pages to corevisor\n");
+    printhex_ul(page_cnt);
+    // memset((char*)base, 0, 2 * SZ_2M);
+
+    el2_data = get_el2_data_start();
+    el2_data->vm_info[vmid].page_pool_start = base;
+
+    /*** End: Allocate memory for VM's s2 page tables ***/
+
+
+
+
+
 
     acquire_lock_vm(vmid);
     // change this so page_pool_start is set to physical address at top of very first 1MB region
