@@ -196,7 +196,7 @@ static u64 inline get_pud_next(u32 vmid) {
 		used_pages = el2_data->vm_info[vmid].pmd_used_pages_vm[pool_index];
 	}
 
-	if (pool_index == 1 && used_pages == PMD_ITER_ONE_MAX_PAGES) {
+	if (pool_index >= 1 && used_pages == PMD_ITER_ONE_MAX_PAGES) {
 		print_string("\rpud for vm exhausted\n");
 		__hyp_panic();
 	}
@@ -217,15 +217,46 @@ static void inline set_pud_next(u32 vmid, u64 next) {
 };
 
 static u64 inline get_pmd_next(u32 vmid) {
+	u64 pool_index;
+	u64 pool_start;
+	u64 used_pages;
   struct el2_data *el2_data = get_el2_data_start();
-	u64 pool_start = el2_data->vm_info[vmid].page_pool_start;
-	u64 used_pages = el2_data->vm_info[vmid].pte_used_pages;
-	return pool_start + (used_pages * PAGE_SIZE) + PMD_BASE;
+	if (vmid == HOSTVISOR || vmid == COREVISOR) {
+		pool_start = el2_data->vm_info[vmid].page_pool_start;
+		used_pages = el2_data->vm_info[vmid].pte_used_pages;
+		return pool_start + (used_pages * PAGE_SIZE) + PMD_BASE;
+	}
+
+	pool_index = el2_data->vm_info[vmid].pte_pool_index;
+	pool_start = el2_data->vm_info[vmid].pte_pool_starts[pool_index];
+	used_pages = el2_data->vm_info[vmid].pte_used_pages_vm[pool_index];
+
+	if (used_pages == PTE_ITER_MAX_PAGES && pool_index + 1 < PTE_USED_ITER_COUNT) {
+		pool_index += 1;
+		el2_data->vm_info[vmid].pte_pool_index = pool_index;
+
+		pool_start = el2_data->vm_info[vmid].pte_pool_starts[pool_index];
+		used_pages = el2_data->vm_info[vmid].pte_used_pages_vm[pool_index];
+	}
+
+	if (used_pages == PTE_ITER_MAX_PAGES && pool_index == PTE_USED_ITER_COUNT - 1) {
+		print_string("\rpmd for vm exhausted\n");
+		__hyp_panic();
+	}
+
+	return pool_start + (used_pages * PAGE_SIZE);
 };
 
 static void inline set_pmd_next(u32 vmid, u64 next) {
+	u64 pool_index;
   struct el2_data *el2_data = get_el2_data_start();
-	el2_data->vm_info[vmid].pte_used_pages += next;
+	if (vmid == HOSTVISOR || vmid == COREVISOR) {
+		el2_data->vm_info[vmid].pte_used_pages += next;
+	}
+	else {
+		pool_index = el2_data->vm_info[vmid].pte_pool_index;
+		el2_data->vm_info[vmid].pte_used_pages_vm[pool_index] += next;
+	}
 };
 
 static u64 inline pgd_pool_end(u32 vmid) {
@@ -241,6 +272,7 @@ static u64 inline pgd_pool_end(u32 vmid) {
 }
 
 static u64 inline pud_pool_end(u32 vmid) {
+	u64 pool_index;
 	u64 pool_start;
   struct el2_data *el2_data = get_el2_data_start();
 	if (vmid == HOSTVISOR || vmid == COREVISOR) {
@@ -248,9 +280,12 @@ static u64 inline pud_pool_end(u32 vmid) {
 		return pool_start + PMD_BASE;
 	}
 
-	// change to use the proper logic
-	u64 pool_start = el2_data->vm_info[vmid].page_poo_start;
-	return pool_start + PMD_BASE;
+	pool_index = el2_data->vm_info[vmid].pmd_pool_index;
+	pool_start = el2_data->vm_info[vmid].pmd_pool_starts[pool_index];
+	if (pool_index == 0) {
+		return pool_start + (PMD_ITER_ONE_MAX_PAGES * PAGE_SIZE);
+	}
+	return pool_start + (PMD_ITER_TWO_MAX_PAGES * PAGE_SIZE);
 }
 
 static u64 inline pmd_pool_end(u32 vmid) {
@@ -260,7 +295,10 @@ static u64 inline pmd_pool_end(u32 vmid) {
 		return pool_start + STAGE2_CORE_PAGES_SIZE;
 	else if (vmid == HOSTVISOR)
 		return pool_start + STAGE2_HOST_POOL_SIZE;
-	return pool_start + PT_POOL_PER_VM;
+
+	pool_index = el2_data->vm_info[vmid].pte_pool_index;
+	pool_start = el2_data->vm_info[vmid].pte_pool_starts[pool_index];
+	return pool_start + (PTE_ITER_MAX_PAGES * PAGE_SIZE);
 }
 
 /*
