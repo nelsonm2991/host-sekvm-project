@@ -100,8 +100,9 @@ static u64 inline pool_start(u32 vmid) {
 		// all still start at zero, so must increment them here.
 		//
 		// Why not just call alloc_s2pt? Can't import it, same logic though
+		print_string("\rpool_start for VM call\n");
 		start = el2_data->vm_info[vmid].s2_pool_start[0];
-		el2_data->vm_info[vmid].s2_used_pages[0] += 1;
+		//el2_data->vm_info[vmid].s2_used_pages[0] += 1;
 
 		return start;
 }
@@ -117,6 +118,7 @@ static u64 inline pool_end(u32 vmid) {
 			return pool_start + STAGE2_HOST_POOL_SIZE;
 
 		// Fragmented Stage2 Iterator Only for VMs
+		print_string("\rpool_end for VM call\n");
 		s2_pool_index = el2_data->vm_info[vmid].s2_pool_index;
 		pool_start = el2_data->vm_info[vmid].s2_pool_start[s2_pool_index];
 		return pool_start + S2_REGION_SIZE;
@@ -155,6 +157,7 @@ static u64 inline get_pt_next(u32 vmid) {
 		}
 	}
 
+	print_string("\rget PT next called for VM\n");
 	return pool_start + used_pages * PAGE_SIZE;
 };
 
@@ -170,7 +173,8 @@ static void inline set_pt_next(u32 vmid, u64 next) {
 		// get_pt_next will do the work of making sure that the s2_pool_index
 		// is pointed in the right spot since get_pt_next calls always
 		// come before set_pt_next calls.
-		el2_data->vm_info[vmid].s2_used_pages[el2_data->vm_info[vmid].s2_pool_index] += 1;
+		print_string("\rset PT next called for VM\n");
+		el2_data->vm_info[vmid].s2_used_pages[el2_data->vm_info[vmid].s2_pool_index] += next;
 	}
 };
 

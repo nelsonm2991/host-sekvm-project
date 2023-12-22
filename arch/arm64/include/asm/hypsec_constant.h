@@ -88,11 +88,6 @@
 #define V_SPSR_0 8
 #define V_HPFAR_MASK 65535UL
 
-// Generalized, fragmented iterator for VM
-#define NUM_S2_REGIONS 8
-#define S2_REGION_SIZE (STAGE2_VM_POOL_SIZE / NUM_S2_REGIONS)
-#define S2_PAGES_PER_REGION (S2_REGION_SIZE / PAGE_SIZE)
-
 /*
 #define PENDING_FSC_FAULT 1UL //????????????
 #define ARM_EXCEPTION_TRAP 0UL
@@ -124,5 +119,10 @@
 #define pte_idx(addr)	pte_index(addr)
 #define v_pmd_table(pmd)	(pmd & PMD_TYPE_MASK)
 #define writable(pte) (((pte) >> 2UL) & 1UL)
+
+// Generalized, fragmented iterator for VM
+#define NUM_S2_REGIONS 8
+#define S2_REGION_SIZE (PT_POOL_PER_VM / NUM_S2_REGIONS)
+#define S2_PAGES_PER_REGION (S2_REGION_SIZE / PAGE_SIZE)
 
 #endif //HYPSEC_CONSTANTS_H

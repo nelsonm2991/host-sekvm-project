@@ -109,6 +109,7 @@ u32 __hyp_text register_kvm()
     // Once parameters are added to register_kvm, then they can be tied in
     // to the given size of regions that is desired.
     struct el2_data *el2_data;
+    print_string("\rRegister KVM: called\n");
 
     acquire_lock_vm(vmid);
     // Must occur before init_s2pt since init_s2pt needs the first page from the iterators
@@ -125,6 +126,7 @@ u32 __hyp_text register_kvm()
             el2_data->vm_info[vmid].s2_used_pages[pool_index] = 0; // verbosity
         }
         el2_data->vm_info[vmid].s2_pool_index = 0; // verbosity
+        print_string("\rRegister KVM: completed the added setup in register_kvm\n");
     }
 
     state = get_vm_state(vmid);

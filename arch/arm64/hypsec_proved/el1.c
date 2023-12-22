@@ -215,6 +215,9 @@ void init_el2_data_page(void)
 			pool_start + (STAGE2_VM_POOL_SIZE * (i - 1));
 //		printk("vm_info[%d].page_pool_start = %llx\n", i, __va(el2_data->vm_info[i].page_pool_start));
 		el2_data->vm_info[i].used_pages = 0;
+
+		// attempted panic fix, maybe vttbr issue?
+		el2_data->vm_info[i].s2_used_pages[0] += 1;
 		//memset(__va(el2_data->vm_info[i].page_pool_start), 0, STAGE2_VM_POOL_SIZE);
 		//FIXME: init vm_info[i].vttbr here, or VMID
 	}
