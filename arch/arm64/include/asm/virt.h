@@ -65,6 +65,8 @@
 #define	HVC_PHYS_ADDR_IOREMAP 28
 /* Releasing memory for stage2 page table */
 #define HVC_DESTROY_KVM 29
+/* Benchmark for corevisor mem usage */
+#define HVC_GET_CORE_MEM_USAGE 30
 #endif
 
 /* Error returned when an invalid stub number is passed into x0 */

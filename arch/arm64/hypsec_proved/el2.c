@@ -190,6 +190,10 @@ void __hyp_text handle_host_hvc(struct s2_host_regs *hr)
 		//__kvm_phys_addr_ioremap((u32)get_host_reg(hr, 1), get_host_reg(hr, 2), get_host_reg(hr, 3), get_host_reg(hr, 4));
 		v_kvm_phys_addr_ioremap((u32)get_host_reg(hr, 1), get_host_reg(hr, 2), get_host_reg(hr, 3), get_host_reg(hr, 4));
 		break;
+	case HVC_GET_CORE_MEM_USAGE:
+		ret = get_core_mem_usage();
+		set_host_regs(0, ret);
+		break;
 	default:
 		print_string("\rno support hvc:\n");
 		printhex_ul(callno);

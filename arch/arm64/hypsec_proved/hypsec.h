@@ -909,6 +909,7 @@ void revoke_vm_page(u32 vmid, u64 pfn);
 void clear_phys_page(unsigned long pfn);
 void update_smmu_page(u32 vmid, u32 cbndx, u32 index, u64 iova, u64 pte);
 void unmap_smmu_page(u32 cbndx, u32 index, u64 iova);
+u64 get_core_mem_usage(void);
 
 /*
  * MemoryOps

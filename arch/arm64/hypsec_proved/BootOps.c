@@ -110,6 +110,7 @@ u32 __hyp_text register_kvm(u64 pageZero, u64 pageOne, u64 pageTwo, u64 pageThre
     u32 state;
     u64 kvm, index, addr, end, owner, page_cnt = 0;
     u32 pte_iter;
+    u64 usage;
     struct el2_data *el2_data;
     int i;
 
@@ -123,6 +124,13 @@ u32 __hyp_text register_kvm(u64 pageZero, u64 pageOne, u64 pageTwo, u64 pageThre
     page_starts[5] = pageFive;
     page_starts[6] = pageSix;
     page_starts[7] = pageSeven;
+
+    /* Core usage before */
+    usage = get_core_mem_usage();
+    print_string("\r=============================\n");
+    print_string("\rCore mem usage before: \n");
+    printhex_ul(usage);
+    print_string("\r=============================\n");
 
     /*** START: Preprocess the 8*1M regions. ***/
 
@@ -238,6 +246,13 @@ u32 __hyp_text register_kvm(u64 pageZero, u64 pageOne, u64 pageTwo, u64 pageThre
 	v_panic();
     }
     release_lock_vm(vmid);
+
+    /* Core usage after */
+    usage = get_core_mem_usage();
+    print_string("\r=============================\n");
+    print_string("\rCore mem usage after: \n");
+    printhex_ul(usage);
+    print_string("\r=============================\n");
     return vmid;
 }
 

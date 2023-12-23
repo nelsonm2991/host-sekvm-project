@@ -66,7 +66,7 @@ void __hyp_text assign_pfn_to_vm(u32 vmid, u64 gfn, u64 pfn)
 		if (count == 0U) {
 			set_pfn_owner(pfn, vmid);
 			clear_pfn_host(pfn);
-			set_pfn_map(pfn, gfn);	
+			set_pfn_map(pfn, gfn);
 		} else {
 			//pfn is mapped to a hostvisor SMMU table
 			print_string("\rassign pfn used by host smmu device\n");
@@ -167,7 +167,7 @@ void __hyp_text __kvm_phys_addr_ioremap(u32 vmid, u64 gpa, u64 pa)
 	acquire_lock_s2page();
 	owner = get_pfn_owner(pa >> PAGE_SHIFT);
 	// check if pfn is truly within an I/O area
-	if (owner == INVALID_MEM) 
+	if (owner == INVALID_MEM)
 		mmap_s2pt(vmid, gpa, 3U, pte);
 	release_lock_s2page();
 }
@@ -224,7 +224,7 @@ void __hyp_text assign_pfn_to_smmu(u32 vmid, u64 gfn, u64 pfn)
 	}
 	else if (owner != vmid)
 	{
-		if (owner != INVALID_MEM) { 
+		if (owner != INVALID_MEM) {
 			print_string("\rvmid\n");
 			printhex_ul(vmid);
 			print_string("\rowner\n");
@@ -265,7 +265,7 @@ void __hyp_text update_smmu_page(u32 vmid, u32 cbndx, u32 index, u64 iova, u64 p
 
 void __hyp_text unmap_smmu_page(u32 cbndx, u32 index, u64 iova)
 {
-	u64 pte, pfn; 
+	u64 pte, pfn;
 	u32 owner, count;
 
 	acquire_lock_s2page();
@@ -326,4 +326,24 @@ void __hyp_text destroy_kvm(u32 vmid) {
     print_string("destroy_kvm(): Assigned the following number of pages "
             "back to the hostvisor:\n");
     printhex_ul(page_cnt);
+}
+
+// Report how many pages are owned by corevisor
+u64 __hyp_text get_core_mem_usage(void)
+{
+	u64 result;
+	u64 currPage;
+	struct el2_data *el2_data;
+
+	el2_data = get_el2_data_start();
+
+	for (currPage = 0; currPage < SZ_2M; currPage++) {
+		if (el2_data->s2_pages[currPage].vmid == COREVISOR) {
+			result += 1;
+		}
+	}
+
+	print_string("\rPages owned by core: \n");
+	printhex_ul(result);
+	return result;
 }

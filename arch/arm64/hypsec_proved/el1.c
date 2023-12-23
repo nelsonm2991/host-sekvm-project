@@ -19,6 +19,7 @@
 #include <linux/serial_reg.h>
 
 //#include "hypsec.h"
+//#define ALLOC_STRESS_TEST 1
 
 //hypsec_host.c
 #define Op0(_x) 	.Op0 = _x
@@ -172,12 +173,12 @@ void init_el2_data_page(void)
 			index += (r->size >> PAGE_SHIFT);
 		} else
 			el2_data->s2_memblock_info[i].index = S2_PFN_SIZE;
-		el2_data->phys_mem_size += el2_data->regions[i].size; 
+		el2_data->phys_mem_size += el2_data->regions[i].size;
 		i++;
 //		printk("memblock %i: base=%llx size=%llx\n", i, r->base, r->size);
 	}
 	el2_data->regions_cnt = i;
-	el2_data->phys_mem_start = el2_data->regions[0].base; 
+	el2_data->phys_mem_start = el2_data->regions[0].base;
 
 	printk("EL2 system phys mem start %llx end %llx\n",
 		el2_data->phys_mem_start, el2_data->phys_mem_size);
@@ -229,7 +230,7 @@ void init_el2_data_page(void)
 	/* CORE POOL -> HOSTVISOR POOL -> VM POOL */
 	el2_data->vm_info[COREVISOR].page_pool_start =
 		el2_data->page_pool_start + CORE_PGD_START;
-	el2_data->vm_info[COREVISOR].used_pages = 0;	
+	el2_data->vm_info[COREVISOR].used_pages = 0;
 
 	/* FIXME: hardcode this for now */
 	//el2_data->smmu_page_pool_start = el2_data->vm_info[EL2_VM_INFO_SIZE - 3].page_pool_start;
@@ -353,7 +354,7 @@ phys_addr_t host_alloc_pgd(unsigned int num)
 
 	/* Start allocating memory from the normal page pool */
 	start = el2_data->vm_info[COREVISOR].page_pool_start;
-	end = start + CORE_PUD_BASE; 
+	end = start + CORE_PUD_BASE;
 	p_addr = (u64)start;
 
 	stage2_spin_unlock(&el2_data->abs_lock);
@@ -373,7 +374,7 @@ phys_addr_t host_alloc_pud(unsigned int num)
 
 	/* Start allocating memory from the normal page pool */
 	start = el2_data->vm_info[COREVISOR].page_pool_start;
-	end = start + CORE_PMD_BASE; 
+	end = start + CORE_PMD_BASE;
 	used_pages = el2_data->vm_info[COREVISOR].pud_used_pages;
 	p_addr = (u64)start + (PAGE_SIZE * used_pages) + CORE_PUD_BASE;
 
@@ -398,7 +399,7 @@ phys_addr_t host_alloc_pmd(unsigned int num)
 
 	/* Start allocating memory from the normal page pool */
 	start = el2_data->vm_info[COREVISOR].page_pool_start;
-	end = start + CORE_PTE_BASE; 
+	end = start + CORE_PTE_BASE;
 	used_pages = el2_data->vm_info[COREVISOR].pmd_used_pages;
 	p_addr = (u64)start + (PAGE_SIZE * used_pages) + CORE_PMD_BASE;
 
@@ -433,7 +434,7 @@ phys_addr_t host_alloc_pte(unsigned int num)
 	//printk("%s start %llx end %llx\n", __func__, start, end);
 	if (p_addr >= end)
 		BUG();
-	memset(__va(p_addr), 0, PAGE_SIZE);	
+	memset(__va(p_addr), 0, PAGE_SIZE);
 	return (phys_addr_t)p_addr;
 }
 
@@ -506,6 +507,36 @@ int hypsec_register_kvm(void)
     bool success = true;
     u64 page_starts[8];
     int i;
+
+		// Avoided separate modules since compiling on the host is a pain
+		// Enabling will cause VM boot to fail and huge memory leak,
+		// but will report how many successful alloc_page calls occured
+		//
+		// Trial 1: 7054 successful calls -> ~7GB success
+		// Trial 2: 7049 successful calls -> ~7GB success
+		// Trail 3: 7054 successful calls -> ~7GB success
+#ifdef ALLOC_STRESS_TEST
+    struct page* result;
+    u64 count;
+
+    result = 0;
+    count = 0;
+		printk(KERN_EMERG "Attempting as many alloc_page(1MB) calls as possible\n");
+    while (true) {
+        result = alloc_pages(GFP_KERNEL, 8);
+        if (result == NULL) {
+            break;
+        }
+        count += 1;
+    }
+
+    // print count
+		printk(KERN_EMERG "RESULT of alloc stress test: %llu", count);
+
+		if (ALLOC_TEST) {
+			return 0;
+		}
+#endif
 
     el2_data = (void *)kvm_ksym_ref(el2_data_start);
     // 2e8 x 4KB pages = 1MB memory region
