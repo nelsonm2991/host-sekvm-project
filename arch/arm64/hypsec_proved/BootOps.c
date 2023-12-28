@@ -160,7 +160,14 @@ u32 __hyp_text register_kvm(u64 pageZero, u64 pageOne, u64 pageTwo, u64 pageThre
                 __hyp_panic();
             }
 
+            // memset here causes guest and host failure
+            // memset((char*)__el2_va(addr), 0, PAGE_SIZE);
+
 	        set_s2_page_vmid(index, COREVISOR);
+
+            // memset here causes guest failure but no host failure
+            // memset(__el2_va(addr), 0, PAGE_SIZE);
+            el2_memset(__el2_va(addr), 0, PAGE_SIZE);
 	        addr += PAGE_SIZE;
             ++page_cnt;
 	    } while (addr < end);
