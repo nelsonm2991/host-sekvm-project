@@ -316,7 +316,7 @@ void __hyp_text destroy_kvm(u32 vmid) {
                 // by register_kvm().
                 __hyp_panic();
             }
-
+					el2_memset(__el2_va(addr), 0, PAGE_SIZE);
 	        set_s2_page_vmid(index, HOSTVISOR);
 	        addr += PAGE_SIZE;
             ++page_cnt;
